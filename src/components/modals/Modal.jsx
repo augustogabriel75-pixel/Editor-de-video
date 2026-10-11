@@ -8,7 +8,7 @@ export default function Modal({ title, subtitle, onClose, children, width = 'max
     return () => window.removeEventListener('keydown', onKey);
   }, [onClose]);
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/65 backdrop-blur-sm p-6" onPointerDown={(e) => e.target === e.currentTarget && onClose?.()}>
+    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/65 backdrop-blur-sm p-6 max-[940px]:p-2" onPointerDown={(e) => e.target === e.currentTarget && onClose?.()}>
       <div className={`w-full ${width} max-h-full overflow-y-auto rounded-2xl bg-ink-850 border border-ink-600 shadow-2xl`}>
         <div className="flex items-start justify-between gap-4 px-5 pt-4 pb-3 border-b border-ink-700">
           <div className="flex items-center gap-3">
@@ -26,7 +26,7 @@ export default function Modal({ title, subtitle, onClose, children, width = 'max
             <X size={16} />
           </button>
         </div>
-        <div className="p-5">{children}</div>
+        <div className="p-5 max-[940px]:p-4">{children}</div>
       </div>
     </div>
   );

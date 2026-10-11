@@ -9,7 +9,7 @@ import TransitionsTab from './TransitionsTab';
 import FiltersTab from './FiltersTab';
 import AIMotionTab from './AIMotionTab';
 
-const TABS = [
+export const PANEL_TABS = [
   { id: 'media', label: 'Mídia', icon: Film, el: MediaTab },
   { id: 'audio', label: 'Áudio', icon: Music, el: AudioTab },
   { id: 'text', label: 'Texto', icon: Type, el: TextTab },
@@ -22,11 +22,11 @@ const TABS = [
 export default function LeftPanel() {
   const tab = useEditorStore((s) => s.leftTab);
   const setTab = useEditorStore((s) => s.setLeftTab);
-  const Active = (TABS.find((t) => t.id === tab) || TABS[0]).el;
+  const Active = (PANEL_TABS.find((t) => t.id === tab) || PANEL_TABS[0]).el;
   return (
     <aside className="w-[348px] shrink-0 flex flex-col bg-ink-850 border-r border-ink-700 min-h-0">
       <nav className="flex shrink-0 border-b border-ink-700 bg-ink-900 px-1 pt-1" role="tablist">
-        {TABS.map((t) => {
+        {PANEL_TABS.map((t) => {
           const active = t.id === tab;
           return (
             <button
@@ -61,4 +61,10 @@ export default function LeftPanel() {
       </div>
     </aside>
   );
+}
+
+/** Conteúdo de uma aba do painel (usado nos "bottom sheets" do layout móvel). */
+export function PanelTabBody({ id }) {
+  const T = (PANEL_TABS.find((t) => t.id === id) || PANEL_TABS[0]).el;
+  return <T />;
 }

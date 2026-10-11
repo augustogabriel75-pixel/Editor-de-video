@@ -102,7 +102,7 @@ export default function AudioTab() {
                 type="button"
                 onClick={() => add(a.id)}
                 title="Adicionar à timeline"
-                className="w-7 h-7 shrink-0 rounded-full bg-ink-600 hover:bg-brand hover:text-ink-950 flex items-center justify-center opacity-0 group-hover:opacity-100 transition"
+                className="w-7 h-7 shrink-0 rounded-full bg-ink-600 hover:bg-brand hover:text-ink-950 flex items-center justify-center opacity-0 group-hover:opacity-100 [@media(hover:none)]:opacity-100 transition"
               >
                 <Plus size={15} />
               </button>

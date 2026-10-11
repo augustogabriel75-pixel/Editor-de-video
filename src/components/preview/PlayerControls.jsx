@@ -5,12 +5,21 @@ import { ASPECT_RATIOS } from '../../lib/catalog';
 import { formatTime } from '../../lib/utils';
 import { setMasterVolume } from '../../engine/audioEngine';
 import { IconButton, cx } from '../ui/primitives';
+import { isNativeApp } from '../../lib/native';
 
 const ASPECT_ICON = { '16:9': RectangleHorizontal, '9:16': Smartphone, '1:1': Square, '4:5': RectangleVertical };
 
-function TimeDisplay() {
+function TimeDisplay({ stacked = false }) {
   const t = useEditorStore((s) => s.currentTime);
   const d = useEditorStore((s) => s.duration);
+  if (stacked) {
+    return (
+      <div className="font-mono tabular-nums">
+        <div className="text-brand">{formatTime(t)}</div>
+        <div className="text-ink-400">{formatTime(d)}</div>
+      </div>
+    );
+  }
   return (
     <div className="font-mono text-[12px] tabular-nums">
       <span className="text-brand">{formatTime(t)}</span>
@@ -63,7 +72,7 @@ function AspectMenu() {
   );
 }
 
-export default function PlayerControls() {
+export default function PlayerControls({ compact = false }) {
   const isPlaying = useEditorStore((s) => s.isPlaying);
   const toggle = useEditorStore((s) => s.togglePlay);
   const step = useEditorStore((s) => s.stepFrame);
@@ -81,6 +90,24 @@ export default function PlayerControls() {
     if (document.fullscreenElement) document.exitFullscreen();
     else el?.requestFullscreen?.();
   };
+
+  if (compact) {
+    return (
+      <div className="h-11 shrink-0 flex items-center gap-1 px-2 border-t border-ink-700 bg-ink-900">
+        <AspectMenu />
+        <div className="flex-1 flex items-center justify-center gap-0.5">
+          <IconButton icon={StepBack} label="Quadro anterior" onClick={() => step(-1)} />
+          <button type="button" onClick={toggle} aria-label="Reproduzir/Pausar" className="mx-1 w-9 h-9 rounded-full bg-white text-ink-950 flex items-center justify-center active:scale-95 transition-transform">
+            {isPlaying ? <Pause size={17} fill="currentColor" /> : <Play size={17} fill="currentColor" className="translate-x-px" />}
+          </button>
+          <IconButton icon={StepForward} label="Próximo quadro" onClick={() => step(1)} />
+        </div>
+        <div className="w-[92px] text-right text-[10.5px] leading-tight">
+          <TimeDisplay stacked />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="h-12 shrink-0 flex items-center gap-3 px-4 border-t border-ink-700 bg-ink-900">
@@ -106,7 +133,7 @@ export default function PlayerControls() {
         <IconButton icon={vol > 0 ? Volume2 : VolumeX} label="Mudo no preview" onClick={() => setVol(vol > 0 ? 0 : 1)} />
         <input type="range" min={0} max={1} step={0.01} value={vol} onChange={(e) => setVol(parseFloat(e.target.value))} className="mc-range w-20" style={{ '--fill': `${vol * 100}%` }} aria-label="Volume do preview" />
         <IconButton icon={Grid3x3} label="Guias de área segura" active={showSafe} onClick={toggleSafe} />
-        <IconButton icon={Maximize} label="Tela cheia" onClick={fullscreen} />
+        {!isNativeApp && <IconButton icon={Maximize} label="Tela cheia" onClick={fullscreen} />}
       </div>
     </div>
   );

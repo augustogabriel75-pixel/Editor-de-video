@@ -5,12 +5,13 @@ import TimelineToolbar from './TimelineToolbar';
 import TimeRuler from './TimeRuler';
 import AIMarkerLane from './AIMarkerLane';
 import TrackRow from './TrackRow';
-import { HEADER_W, RULER_H, AI_LANE_H } from './constants';
+import { RULER_H, AI_LANE_H } from './constants';
+import { useTimelineMetrics } from './metrics';
 
-function PlayheadLine() {
+function PlayheadLine({ headerW }) {
   const t = useEditorStore((s) => s.currentTime);
   const pps = useEditorStore((s) => s.pxPerSec);
-  return <div className="absolute top-0 bottom-0 w-px bg-white z-[25] pointer-events-none shadow-[0_0_6px_rgba(255,255,255,.6)]" style={{ left: HEADER_W + t * pps }} />;
+  return <div className="absolute top-0 bottom-0 w-px bg-white z-[25] pointer-events-none shadow-[0_0_6px_rgba(255,255,255,.6)]" style={{ left: headerW + t * pps }} />;
 }
 
 export default function Timeline({ height }) {
@@ -20,6 +21,8 @@ export default function Timeline({ height }) {
   const setZoom = useEditorStore((s) => s.setZoom);
   const scrollRef = useRef(null);
   const [viewW, setViewW] = useState(1000);
+  const { compact, headerW } = useTimelineMetrics();
+  const HEADER_W = headerW;
 
   useEffect(() => {
     const el = scrollRef.current;
@@ -40,7 +43,7 @@ export default function Timeline({ height }) {
           const el = scrollRef.current;
           if (!el || !s.isPlaying) return;
           const x = t * s.pxPerSec;
-          const visW = el.clientWidth - HEADER_W;
+          const visW = el.clientWidth - (window.matchMedia('(max-width: 940px)').matches ? 100 : 176);
           if (x > el.scrollLeft + visW - 40 || x < el.scrollLeft) el.scrollLeft = Math.max(0, x - 80);
         },
       ),
@@ -57,34 +60,56 @@ export default function Timeline({ height }) {
       const s = useEditorStore.getState();
       s.setZoom(s.pxPerSec * (e.deltaY < 0 ? 1.12 : 1 / 1.12));
     };
+    // Pinça com dois dedos = zoom (celular)
+    let pinch = null;
+    const dist = (t) => Math.hypot(t[0].clientX - t[1].clientX, t[0].clientY - t[1].clientY);
+    const onTouchStart = (e) => {
+      if (e.touches.length === 2) pinch = { d: dist(e.touches), pps: useEditorStore.getState().pxPerSec };
+    };
+    const onTouchMove = (e) => {
+      if (!pinch || e.touches.length !== 2) return;
+      e.preventDefault();
+      useEditorStore.getState().setZoom((pinch.pps * dist(e.touches)) / Math.max(1, pinch.d));
+    };
+    const onTouchEnd = (e) => {
+      if (e.touches.length < 2) pinch = null;
+    };
     el.addEventListener('wheel', onWheel, { passive: false });
-    return () => el.removeEventListener('wheel', onWheel);
+    el.addEventListener('touchstart', onTouchStart, { passive: true });
+    el.addEventListener('touchmove', onTouchMove, { passive: false });
+    el.addEventListener('touchend', onTouchEnd);
+    return () => {
+      el.removeEventListener('wheel', onWheel);
+      el.removeEventListener('touchstart', onTouchStart);
+      el.removeEventListener('touchmove', onTouchMove);
+      el.removeEventListener('touchend', onTouchEnd);
+    };
   }, []);
 
   const laneW = Math.max(duration + 6, (viewW - HEADER_W) / pps) * pps;
   const fit = () => setZoom((viewW - HEADER_W - 40) / Math.max(1, duration));
 
   return (
-    <div className="shrink-0 flex flex-col bg-ink-900 border-t border-ink-700 min-h-0" style={{ height }}>
-      <TimelineToolbar onFit={fit} />
+    <div className={`flex flex-col bg-ink-900 border-t border-ink-700 min-h-0 ${height ? 'shrink-0' : 'flex-1'}`} style={height ? { height } : undefined}>
+      <TimelineToolbar onFit={fit} compact={compact} />
       <div ref={scrollRef} className="relative flex-1 min-h-0 overflow-auto">
         <div className="relative" style={{ width: HEADER_W + laneW, minHeight: '100%' }}>
           <div className="sticky top-0 z-30 flex" style={{ height: RULER_H }}>
             <div className="sticky left-0 z-40 shrink-0 bg-ink-900 border-r border-b border-ink-700 flex items-center px-2 text-[10px] text-ink-400 font-mono" style={{ width: HEADER_W }}>
-              {Math.round(pps)} px/s
+              {compact ? 'Trilhas' : `${Math.round(pps)} px/s`}
             </div>
             <TimeRuler width={laneW} />
           </div>
           <div className="sticky z-[29] flex" style={{ top: RULER_H, height: AI_LANE_H }}>
             <div className="sticky left-0 z-40 shrink-0 bg-[#16122a] border-r border-b border-ai/20 flex items-center px-2" style={{ width: HEADER_W }}>
-              <AIBadge small />
+              {compact ? <span className="text-[9px] font-bold ai-text">✨ IA Motion</span> : <AIBadge small />}
             </div>
             <AIMarkerLane width={laneW} />
           </div>
           {tracks.map((t) => (
             <TrackRow key={t.id} track={t} />
           ))}
-          <PlayheadLine />
+          <PlayheadLine headerW={HEADER_W} />
         </div>
       </div>
     </div>

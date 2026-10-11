@@ -31,7 +31,7 @@ export function AssetCard({ asset, onAdd }) {
         type="button"
         onClick={() => onAdd(asset.id)}
         title="Adicionar à timeline"
-        className="absolute right-1.5 bottom-8 w-7 h-7 rounded-full bg-brand text-ink-950 flex items-center justify-center opacity-0 group-hover:opacity-100 shadow-lg transition-opacity"
+        className="absolute right-1.5 bottom-8 w-7 h-7 rounded-full bg-brand text-ink-950 flex items-center justify-center opacity-0 group-hover:opacity-100 [@media(hover:none)]:opacity-100 shadow-lg transition-opacity"
       >
         <Plus size={16} strokeWidth={2.5} />
       </button>

@@ -11,6 +11,8 @@ import ExportModal from './components/modals/ExportModal';
 import CaptionsModal from './components/modals/CaptionsModal';
 import ShortcutsModal from './components/modals/ShortcutsModal';
 import Toasts from './components/ui/Toasts';
+import MobileLayout from './components/layout/MobileLayout';
+import { useIsMobile } from './hooks/useIsMobile';
 
 function ResizeHandle({ onDrag }) {
   return (
@@ -38,10 +40,30 @@ export default function App() {
   const [tlH, setTlH] = useState(() => Math.round(Math.min(420, Math.max(300, window.innerHeight * 0.4))));
   const [base, setBase] = useState(tlH);
 
+  const mobile = useIsMobile();
+
   useShortcuts();
   useEffect(() => {
     initPlayback();
   }, []);
+
+  const modals = (
+    <>
+      {modal === 'export' && <ExportModal />}
+      {modal === 'captions' && <CaptionsModal />}
+      {modal === 'shortcuts' && <ShortcutsModal />}
+      <Toasts />
+    </>
+  );
+
+  if (mobile) {
+    return (
+      <>
+        <MobileLayout />
+        {modals}
+      </>
+    );
+  }
 
   return (
     <div className="h-full flex flex-col bg-ink-950 text-ink-100">
@@ -61,10 +83,7 @@ export default function App() {
         />
         <Timeline height={tlH} />
       </div>
-      {modal === 'export' && <ExportModal />}
-      {modal === 'captions' && <CaptionsModal />}
-      {modal === 'shortcuts' && <ShortcutsModal />}
-      <Toasts />
+      {modals}
     </div>
   );
 }

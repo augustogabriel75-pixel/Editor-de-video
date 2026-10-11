@@ -53,7 +53,7 @@ export default function TimeRuler({ width }) {
   };
 
   return (
-    <div className="relative bg-ink-900 border-b border-ink-700 cursor-pointer" style={{ width, height: RULER_H }} onPointerDown={onDown}>
+    <div className="relative bg-ink-900 border-b border-ink-700 cursor-pointer touch-none" style={{ width, height: RULER_H }} onPointerDown={onDown}>
       <svg width={width} height={RULER_H} className="absolute inset-0">
         {ticks.map(({ t, isMajor }) => (
           <g key={t}>

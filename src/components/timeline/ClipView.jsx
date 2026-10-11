@@ -12,6 +12,22 @@ function startInteraction(e, clip, mode) {
   e.stopPropagation();
   if (e.button !== 0) return;
   const st0 = useEditorStore.getState();
+  // Toque: em clipe não selecionado, tocar seleciona e deslizar rola a timeline.
+  if (e.pointerType === 'touch' && st0.selectedClipId !== clip.id) {
+    const tx = e.clientX;
+    const ty = e.clientY;
+    const cleanup = () => {
+      window.removeEventListener('pointerup', onUp);
+      window.removeEventListener('pointercancel', cleanup);
+    };
+    const onUp = (ev) => {
+      cleanup();
+      if (Math.hypot(ev.clientX - tx, ev.clientY - ty) < 10) useEditorStore.getState().select(clip.id);
+    };
+    window.addEventListener('pointerup', onUp);
+    window.addEventListener('pointercancel', cleanup);
+    return;
+  }
   st0.select(clip.id);
   if (st0.tracks.find((t) => t.id === clip.trackId)?.locked) return;
   const pps = st0.pxPerSec;
@@ -80,7 +96,7 @@ function Badges({ clip }) {
   );
 }
 
-function ClipView({ clip, track, height }) {
+function ClipView({ clip, track, height, compact = false }) {
   const pps = useEditorStore((s) => s.pxPerSec);
   const selected = useEditorStore((s) => s.selectedClipId === clip.id);
   const rendering = useEditorStore((s) => !!s.ai.render?.pending?.includes(clip.id));
@@ -154,6 +170,7 @@ function ClipView({ clip, track, height }) {
     <div
       className={cx(
         'group absolute top-[3px] rounded-md border overflow-hidden cursor-grab active:cursor-grabbing select-none',
+        selected ? 'touch-none' : 'touch-auto',
         cls,
         selected && 'ring-2 ring-white z-10',
         clip.disabled && 'opacity-40 [background-image:repeating-linear-gradient(45deg,transparent,transparent_6px,rgba(255,255,255,.06)_6px,rgba(255,255,255,.06)_12px)]',
@@ -172,13 +189,17 @@ function ClipView({ clip, track, height }) {
         <Diamond key={k.id} size={9} className="absolute bottom-0.5 text-brand fill-brand -translate-x-1/2 drop-shadow" style={{ left: k.t * pps }} />
       ))}
       <div
-        className={cx('absolute left-0 top-0 bottom-0 w-2 cursor-ew-resize bg-white/0 hover:bg-white/50', selected && 'bg-white/70')}
+        className={cx('absolute left-0 top-0 bottom-0 cursor-ew-resize bg-white/0 hover:bg-white/50 touch-none', compact && selected ? 'w-4 bg-white/85 flex items-center justify-center' : 'w-2', selected && 'bg-white/70')}
         onPointerDown={(e) => startInteraction(e, clip, 'left')}
-      />
+      >
+        {compact && selected && <span className="w-0.5 h-1/2 rounded bg-ink-900/60" />}
+      </div>
       <div
-        className={cx('absolute right-0 top-0 bottom-0 w-2 cursor-ew-resize bg-white/0 hover:bg-white/50', selected && 'bg-white/70')}
+        className={cx('absolute right-0 top-0 bottom-0 cursor-ew-resize bg-white/0 hover:bg-white/50 touch-none', compact && selected ? 'w-4 bg-white/85 flex items-center justify-center' : 'w-2', selected && 'bg-white/70')}
         onPointerDown={(e) => startInteraction(e, clip, 'right')}
-      />
+      >
+        {compact && selected && <span className="w-0.5 h-1/2 rounded bg-ink-900/60" />}
+      </div>
     </div>
   );
 }

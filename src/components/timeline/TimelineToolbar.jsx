@@ -67,7 +67,7 @@ function SpeedMenu() {
   );
 }
 
-export default function TimelineToolbar({ onFit }) {
+export default function TimelineToolbar({ onFit, compact = false }) {
   const split = useEditorStore((s) => s.splitAtPlayhead);
   const del = useEditorStore((s) => s.deleteSelected);
   const dup = useEditorStore((s) => s.duplicateSelected);
@@ -85,7 +85,7 @@ export default function TimelineToolbar({ onFit }) {
   const setZoom = useEditorStore((s) => s.setZoom);
 
   return (
-    <div className="h-10 shrink-0 flex items-center gap-1 px-2 border-b border-ink-700 bg-ink-850">
+    <div className={cx('h-10 shrink-0 flex items-center gap-1 px-2 border-b border-ink-700 bg-ink-850', compact && 'overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden')}>
       <ToolButton icon={Scissors} label="Dividir" shortcut="S" onClick={split} />
       <ToolButton icon={Trash2} label="Excluir" shortcut="Del" onClick={del} disabled={!hasSel} />
       <ToolButton icon={Copy} label="Duplicar" shortcut="Ctrl+D" onClick={dup} disabled={!hasSel} />
@@ -104,13 +104,13 @@ export default function TimelineToolbar({ onFit }) {
       >
         <span className="absolute inset-0 ai-shimmer" />
         {busy ? <LoaderCircle size={13} className="relative animate-spin" /> : <WandSparkles size={13} className="relative" />}
-        <span className="relative">Gerar Motion IA</span>
+        <span className="relative">{compact ? 'IA' : 'Gerar Motion IA'}</span>
       </button>
-      <div className="flex-1" />
+      <div className="flex-1 min-w-2" />
       <IconButton icon={Magnet} label={`Snap ${snapping ? 'ligado' : 'desligado'}`} active={snapping} onClick={toggleSnap} />
-      <div className="w-px h-5 bg-ink-700 mx-1" />
+      {!compact && <div className="w-px h-5 bg-ink-700 mx-1" />}
       <IconButton icon={ZoomOut} label="Diminuir zoom (-)" onClick={() => setZoom(pps / 1.25)} />
-      <input
+      {!compact && <input
         type="range"
         min={Math.log(8)}
         max={Math.log(260)}
@@ -120,7 +120,7 @@ export default function TimelineToolbar({ onFit }) {
         className="mc-range w-28"
         style={{ '--fill': `${((Math.log(pps) - Math.log(8)) / (Math.log(260) - Math.log(8))) * 100}%` }}
         aria-label="Zoom da timeline"
-      />
+      />}
       <IconButton icon={ZoomIn} label="Aumentar zoom (+)" onClick={() => setZoom(pps * 1.25)} />
       <IconButton icon={Maximize2} label="Ajustar à janela" onClick={onFit} />
     </div>

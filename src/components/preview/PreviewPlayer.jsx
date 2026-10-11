@@ -51,7 +51,7 @@ function ActiveAIChips() {
   );
 }
 
-export default function PreviewPlayer() {
+export default function PreviewPlayer({ compact = false }) {
   const wrapRef = useRef(null);
   const canvasRef = useRef(null);
   const overlayRef = useRef(null);
@@ -68,8 +68,8 @@ export default function PreviewPlayer() {
     if (!el) return;
     const fit = () => {
       const r = el.getBoundingClientRect();
-      const aw = Math.max(100, r.width - 32);
-      const ah = Math.max(100, r.height - 24);
+      const aw = Math.max(80, r.width - (compact ? 12 : 32));
+      const ah = Math.max(60, r.height - (compact ? 10 : 24));
       const a = aspect.w / aspect.h;
       let w = aw;
       let h = w / a;
@@ -83,12 +83,12 @@ export default function PreviewPlayer() {
     const ro = new ResizeObserver(fit);
     ro.observe(el);
     return () => ro.disconnect();
-  }, [aspect.w, aspect.h]);
+  }, [aspect.w, aspect.h, compact]);
 
   const dpr = Math.min(2, window.devicePixelRatio || 1);
   let cw = Math.round(box.w * dpr);
   let ch = Math.round(box.h * dpr);
-  const k = Math.min(1, MAX_RENDER / Math.max(cw, ch));
+  const k = Math.min(1, (compact ? 1280 : MAX_RENDER) / Math.max(cw, ch));
   cw = Math.round(cw * k);
   ch = Math.round(ch * k);
 
@@ -215,10 +215,10 @@ export default function PreviewPlayer() {
     <section className="flex-1 min-w-0 flex flex-col bg-ink-950">
       <div ref={wrapRef} className="relative flex-1 min-h-0 flex items-center justify-center">
         <div className="relative shadow-2xl shadow-black/60 ring-1 ring-ink-700" style={{ width: box.w, height: box.h }}>
-          <canvas ref={canvasRef} width={cw} height={ch} className="block w-full h-full bg-black cursor-default" onPointerDown={onCanvasDown} />
+          <canvas ref={canvasRef} width={cw} height={ch} className="block w-full h-full bg-black cursor-default touch-none" onPointerDown={onCanvasDown} />
           <div
             ref={overlayRef}
-            className="absolute left-0 top-0 border-2 border-brand/90 rounded-sm cursor-move hidden origin-center"
+            className="absolute left-0 top-0 border-2 border-brand/90 rounded-sm cursor-move hidden origin-center touch-none"
             style={{ boxShadow: '0 0 0 1px rgba(0,0,0,.4)' }}
             onPointerDown={(e) => startDrag(e, useEditorStore.getState().selectedClipId, 'move')}
           >
@@ -226,7 +226,7 @@ export default function PreviewPlayer() {
               <span
                 key={pos}
                 onPointerDown={(e) => startDrag(e, useEditorStore.getState().selectedClipId, 'scale')}
-                className={`absolute ${pos} w-3 h-3 rounded-full bg-white border-2 border-brand cursor-nwse-resize`}
+                className={`absolute ${pos} ${compact ? 'w-4 h-4' : 'w-3 h-3'} rounded-full bg-white border-2 border-brand cursor-nwse-resize touch-none`}
               />
             ))}
           </div>
@@ -248,7 +248,7 @@ export default function PreviewPlayer() {
           )}
         </div>
       </div>
-      <PlayerControls />
+      <PlayerControls compact={compact} />
     </section>
   );
 }

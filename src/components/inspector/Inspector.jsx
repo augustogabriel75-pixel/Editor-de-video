@@ -55,7 +55,7 @@ function tabsFor(clip, asset) {
 
 const KIND_ICON = { video: Film, image: ImageIcon, audio: AudioLines, text: Type, caption: Captions };
 
-export default function Inspector() {
+export default function Inspector({ embedded = false }) {
   const clip = useEditorStore(selectSelectedClip);
   const asset = useEditorStore((s) => (clip ? s.assets.find((a) => a.id === clip.assetId) : null));
   const tab = useEditorStore((s) => s.inspectorTab);
@@ -65,7 +65,7 @@ export default function Inspector() {
 
   if (!clip) {
     return (
-      <aside className="w-[320px] shrink-0 bg-ink-850 border-l border-ink-700 overflow-y-auto">
+      <aside className={embedded ? 'w-full' : 'w-[320px] shrink-0 bg-ink-850 border-l border-ink-700 overflow-y-auto'}>
         <ProjectPanel />
       </aside>
     );
@@ -75,7 +75,7 @@ export default function Inspector() {
   const Icon = clip.kind === 'motion' ? iconFor(getTemplate(clip.motion.templateId).icon) : KIND_ICON[clip.kind];
 
   return (
-    <aside className="w-[320px] shrink-0 bg-ink-850 border-l border-ink-700 flex flex-col min-h-0">
+    <aside className={embedded ? 'w-full h-full flex flex-col min-h-0' : 'w-[320px] shrink-0 bg-ink-850 border-l border-ink-700 flex flex-col min-h-0'}>
       <div className="px-4 pt-3 pb-2 border-b border-ink-700 space-y-2">
         <div className="flex items-center gap-2">
           <div className={cx('w-8 h-8 rounded-lg flex items-center justify-center shrink-0', clip.kind === 'motion' ? 'ai-gradient' : 'bg-ink-700')}>

@@ -2,7 +2,7 @@ import { Undo2, Redo2, Download, Sparkles, LoaderCircle, Keyboard, Cpu, Check } 
 import { useEditorStore } from '../../store/useEditorStore';
 import { IconButton, cx } from '../ui/primitives';
 
-function AIRenderIndicator() {
+function AIRenderIndicator({ compact = false }) {
   const ai = useEditorStore((s) => s.ai);
   const count = useEditorStore((s) => s.clips.reduce((n, c) => n + (c.kind === 'motion' && c.ai ? 1 : 0), 0));
   const setLeftTab = useEditorStore((s) => s.setLeftTab);
@@ -14,7 +14,7 @@ function AIRenderIndicator() {
     content = (
       <>
         <LoaderCircle size={14} className="animate-spin" />
-        <span className="hidden xl:inline truncate max-w-[200px]">{step?.label || 'Analisando'}</span>
+        {!compact && <span className="hidden xl:inline truncate max-w-[200px]">{step?.label || 'Analisando'}</span>}
         <span className="font-mono">{Math.round(ai.progress * 100)}%</span>
       </>
     );
@@ -23,7 +23,7 @@ function AIRenderIndicator() {
     content = (
       <>
         <Cpu size={14} className="animate-pulse" />
-        <span>Render IA</span>
+        {!compact && <span>Render IA</span>}
         <span className="font-mono">
           {ai.render.done}/{ai.render.total}
         </span>
@@ -34,16 +34,14 @@ function AIRenderIndicator() {
     content = (
       <>
         <Check size={14} />
-        <span>
-          {count} motions IA <span className="hidden xl:inline">renderizados</span>
-        </span>
+        <span>{compact ? `${count} IA` : <>{count} motions IA <span className="hidden xl:inline">renderizados</span></>}</span>
       </>
     );
   } else {
     content = (
       <>
         <Sparkles size={14} />
-        <span>IA Motion pronta</span>
+        <span>{compact ? 'IA' : 'IA Motion pronta'}</span>
       </>
     );
   }
@@ -54,7 +52,8 @@ function AIRenderIndicator() {
       onClick={() => setLeftTab('ai')}
       title="Indicador do motor de IA Motion"
       className={cx(
-        'relative overflow-hidden flex items-center gap-2 h-8 px-3 rounded-full text-[12px] font-medium border transition-colors',
+        'relative overflow-hidden flex items-center gap-1.5 rounded-full font-medium border transition-colors shrink-0',
+        compact ? 'h-7 px-2 text-[11px]' : 'h-8 px-3 text-[12px] gap-2',
         tone === 'busy' && 'border-ai/60 text-white bg-ai/15 animate-pulse-glow',
         tone === 'ready' && 'border-emerald-400/40 text-emerald-200 bg-emerald-400/10',
         tone === 'idle' && 'border-ink-600 text-ink-200 bg-ink-800 hover:border-ai/50',
@@ -66,7 +65,7 @@ function AIRenderIndicator() {
   );
 }
 
-export default function TopBar() {
+export default function TopBar({ compact = false }) {
   const title = useEditorStore((s) => s.project.title);
   const setProject = useEditorStore((s) => s.setProject);
   const canUndo = useEditorStore((s) => s.past.length > 0);
@@ -74,6 +73,42 @@ export default function TopBar() {
   const undo = useEditorStore((s) => s.undo);
   const redo = useEditorStore((s) => s.redo);
   const openModal = useEditorStore((s) => s.openModal);
+
+  if (compact) {
+    return (
+      <header className="h-11 shrink-0 flex items-center gap-1.5 pl-2 pr-1.5 bg-ink-900 border-b border-ink-700">
+        <div className="w-7 h-7 shrink-0 rounded-lg bg-ink-950 border border-ink-600 flex items-center justify-center">
+          <svg viewBox="0 0 64 64" className="w-5 h-5">
+            <defs>
+              <linearGradient id="mcgm" x1="0" y1="0" x2="1" y2="1">
+                <stop offset="0" stopColor="#22d3ee" />
+                <stop offset="1" stopColor="#a855f7" />
+              </linearGradient>
+            </defs>
+            <path d="M12 48V16l12 15 12-15v32" fill="none" stroke="url(#mcgm)" strokeWidth="7" strokeLinecap="round" strokeLinejoin="round" />
+            <path d="M43 22l10-5v30l-10-5z" fill="url(#mcgm)" />
+          </svg>
+        </div>
+        <input
+          value={title}
+          onChange={(e) => setProject({ title: e.target.value }, 'title')}
+          className="flex-1 min-w-0 bg-transparent focus:bg-ink-800 rounded-md px-1.5 py-1 text-[12.5px] font-semibold text-ink-100 outline-none truncate"
+          aria-label="Título do projeto"
+        />
+        <IconButton icon={Undo2} label="Desfazer" onClick={undo} disabled={!canUndo} />
+        <IconButton icon={Redo2} label="Refazer" onClick={redo} disabled={!canRedo} />
+        <AIRenderIndicator compact />
+        <button
+          type="button"
+          onClick={() => openModal('export')}
+          className="shrink-0 inline-flex items-center gap-1 h-7 px-2.5 rounded-full text-[11.5px] font-bold text-ink-950 bg-gradient-to-r from-cyan-300 via-brand to-fuchsia-400"
+        >
+          <Download size={13} />
+          Exportar
+        </button>
+      </header>
+    );
+  }
 
   return (
     <header className="h-12 shrink-0 flex items-center gap-3 px-3 bg-ink-900 border-b border-ink-700">

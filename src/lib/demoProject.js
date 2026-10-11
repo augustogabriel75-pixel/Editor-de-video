@@ -5,16 +5,16 @@ import { DEMO_TRANSCRIPT } from '../ai/demoTranscript';
 import { mediaClip, textClip } from './clipFactory';
 
 export const DEFAULT_TRACKS = [
-  { id: 'trk-ai-sticker', kind: 'motion', name: 'Stickers IA', lane: 'sticker', ai: true, height: 32 },
-  { id: 'trk-ai-typo', kind: 'motion', name: 'Tipografia IA', lane: 'typography', ai: true, height: 32 },
-  { id: 'trk-ai-camera', kind: 'motion', name: 'Câmera & Transições IA', lane: 'camera', ai: true, height: 32 },
-  { id: 'trk-text', kind: 'text', name: 'Texto', height: 34 },
-  { id: 'trk-captions', kind: 'text', name: 'Legendas', height: 34 },
-  { id: 'trk-pip', kind: 'overlay', name: 'Sobreposição (PIP)', height: 40 },
-  { id: 'trk-main', kind: 'video', name: 'Vídeo Principal', main: true, height: 56 },
-  { id: 'trk-voice', kind: 'audio', name: 'Narração', height: 38 },
-  { id: 'trk-music', kind: 'audio', name: 'Música', height: 38 },
-  { id: 'trk-sfx', kind: 'audio', name: 'Efeitos Sonoros', height: 32 },
+  { id: 'trk-ai-sticker', short: 'Stickers', kind: 'motion', name: 'Stickers IA', lane: 'sticker', ai: true, height: 32 },
+  { id: 'trk-ai-typo', short: 'Tipografia', kind: 'motion', name: 'Tipografia IA', lane: 'typography', ai: true, height: 32 },
+  { id: 'trk-ai-camera', short: 'Câmera', kind: 'motion', name: 'Câmera & Transições IA', lane: 'camera', ai: true, height: 32 },
+  { id: 'trk-text', short: 'Texto', kind: 'text', name: 'Texto', height: 34 },
+  { id: 'trk-captions', short: 'Legendas', kind: 'text', name: 'Legendas', height: 34 },
+  { id: 'trk-pip', short: 'PIP', kind: 'overlay', name: 'Sobreposição (PIP)', height: 40 },
+  { id: 'trk-main', short: 'Vídeo', kind: 'video', name: 'Vídeo Principal', main: true, height: 56 },
+  { id: 'trk-voice', short: 'Voz', kind: 'audio', name: 'Narração', height: 38 },
+  { id: 'trk-music', short: 'Música', kind: 'audio', name: 'Música', height: 38 },
+  { id: 'trk-sfx', short: 'SFX', kind: 'audio', name: 'Efeitos Sonoros', height: 32 },
 ].map((t) => ({ muted: false, hidden: false, locked: false, ...t }));
 
 export function createLibraryAssets() {

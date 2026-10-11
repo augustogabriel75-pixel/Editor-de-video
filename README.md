@@ -14,6 +14,26 @@ Stack: **React 19 + Vite**, **Tailwind CSS v4**, **Zustand** (estado global), **
 
 O projeto abre com uma demonstração de 30 s (apresentador, B-roll, narração e música lo-fi). Para ver o motor de IA, abra a aba **IA Motion** e clique em **Analisar Contexto do Vídeo**.
 
+### App Android (APK)
+
+O MotionCut também é um app Android: uma Activity nativa com WebView que carrega o editor empacotado. Funciona offline, com as fontes embutidas, e tem layout próprio para celular, no estilo do CapCut mobile.
+
+- **Instalar:** copie `MotionCut-<versão>.apk` para o celular, abra o arquivo e permita a "instalação de apps desconhecidos". Requer Android 7.0 ou superior.
+- **Gerar o APK:** `npm run apk` cria `android/build/MotionCut-<versão>.apk`. O build usa `aapt2`, `dx`/`d8`, `zipalign` e `apksigner` (no Ubuntu: `sudo apt install aapt dalvik-exchange zipalign apksigner`) e um JDK 17+. Não usa Gradle nem AndroidX; o `android.jar` é baixado automaticamente.
+- **CI:** o workflow `.github/workflows/android-apk.yml` gera o APK a cada push e o anexa como artefato ("MotionCut-apk").
+- **Recursos nativos** (`window.MotionCutNative`):
+  - voz da narração demo via TextToSpeech do Android;
+  - **Salvar na galeria** (Filmes/MotionCut) e **Compartilhar** o vídeo exportado;
+  - seletor de arquivos para importar mídia;
+  - botão voltar fecha painéis antes de sair do app;
+  - tela fica ligada durante a exportação.
+- **Assinatura:** usa a chave de teste `android/keystore/motioncut-test.keystore` (senha `motioncut`). Serve para instalar e atualizar versões de teste; para publicar, gere uma chave própria (`KEYSTORE`, `KS_PASS`, `KS_ALIAS`).
+
+No celular, o editor tem esta disposição:
+- preview no topo (o divisor abaixo dele é arrastável) e timeline no meio;
+- barra inferior com Editar, Mídia, Áudio, Texto, Efeitos, Transições, Filtros e IA Motion, cada um abrindo um painel deslizante;
+- na timeline: tocar seleciona um clipe e deslizar rola. Para mover um clipe, selecione-o e depois arraste-o ou use as alças laterais. Use a pinça com dois dedos para zoom.
+
 ---
 
 ## 1. Interface (layout estilo CapCut)
@@ -89,8 +109,11 @@ src/
 │   ├── motionGenerator.js    # Gera os clipes de motion e SFX
 │   └── captionGenerator.js   # Divide a transcrição em legendas
 ├── audio/synth.js            # Músicas e SFX sintetizados (com batidas reais)
+├── lib/native.js             # Ponte com o app Android (TTS, salvar/compartilhar)
 ├── lib/                      # Catálogos, curvas de velocidade, keyframes, fábrica de clipes…
-└── components/               # layout/, left/, preview/, inspector/, timeline/, modals/, ui/
+└── components/               # layout/ (desktop + MobileLayout), left/, preview/, inspector/, timeline/, modals/, ui/
+android/app/src/main/         # App nativo: MainActivity (WebView), NativeBridge, ShareProvider, recursos
+scripts/build-apk.sh          # Build do APK (aapt2 → javac → dx/d8 → zipalign → apksigner)
 ```
 
 **Estado global.** Todas as atualizações são imutáveis, então o histórico guarda só referências. Ajustes contínuos, como arrastar um slider ou mover um clipe, entram como **um único passo** no histórico. O store fica em `window.MotionCut.store` para depuração ou automação, por exemplo `MotionCut.store.getState().runAIAnalysis()`.

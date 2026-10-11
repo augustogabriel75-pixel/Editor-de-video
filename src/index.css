@@ -32,6 +32,10 @@
     0%, 100% { box-shadow: 0 0 0 0 rgb(168 85 247 / 0.55), 0 0 12px rgb(168 85 247 / 0.35); }
     50% { box-shadow: 0 0 0 4px rgb(168 85 247 / 0), 0 0 22px rgb(236 72 153 / 0.55); }
   }
+  @keyframes sheet-in {
+    from { transform: translateY(24px); opacity: 0; }
+    to { transform: translateY(0); opacity: 1; }
+  }
   @keyframes float {
     0%, 100% { transform: translateY(0); }
     50% { transform: translateY(-3px); }
@@ -50,6 +54,10 @@ body {
   -webkit-font-smoothing: antialiased;
   overflow: hidden;
   user-select: none;
+  -webkit-user-select: none;
+  -webkit-tap-highlight-color: transparent;
+  overscroll-behavior: none;
+  touch-action: manipulation;
 }
 
 /* Scrollbars discretos */

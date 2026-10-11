@@ -1,10 +1,12 @@
 import { useMemo, useRef, useState } from 'react';
-import { Download, Film, CircleCheck, LoaderCircle, TriangleAlert } from 'lucide-react';
+import { Download, Film, CircleCheck, LoaderCircle, TriangleAlert, Share2, Images } from 'lucide-react';
 import { useEditorStore } from '../../store/useEditorStore';
 import { exportVideo, RESOLUTIONS, frameSize, supportedFormats } from '../../engine/exporter';
 import { formatTime } from '../../lib/utils';
 import { Button, cx } from '../ui/primitives';
 import Modal from './Modal';
+import { isNativeApp, saveBlobNative, nativeKeepScreenOn } from '../../lib/native';
+import { isTouchDevice } from '../../hooks/useIsMobile';
 
 const fmtBytes = (b) => (b > 1e6 ? `${(b / 1e6).toFixed(1)} MB` : `${Math.round(b / 1e3)} KB`);
 
@@ -13,7 +15,8 @@ export default function ExportModal() {
   const project = useEditorStore((s) => s.project);
   const duration = useEditorStore((s) => s.duration);
   const formats = useMemo(() => supportedFormats(), []);
-  const [res, setRes] = useState('2160p');
+  const [res, setRes] = useState(() => (isTouchDevice() ? '1080p' : '2160p'));
+  const [saveState, setSaveState] = useState(null);
   const [fps, setFps] = useState(30);
   const [fmt, setFmt] = useState(formats[0]?.id);
   const [state, setState] = useState({ phase: 'idle', progress: 0, result: null, error: null });
@@ -27,6 +30,8 @@ export default function ExportModal() {
     if (!format) return;
     abortRef.current = new AbortController();
     setState({ phase: 'running', progress: 0, result: null, error: null });
+    setSaveState(null);
+    nativeKeepScreenOn(true);
     try {
       const result = await exportVideo({ aspect: project.aspect, short: r.short, fps, format, signal: abortRef.current.signal, onProgress: (progress) => setState((s) => ({ ...s, progress })) });
       if (!result) setState({ phase: 'idle', progress: 0, result: null, error: null });
@@ -35,6 +40,19 @@ export default function ExportModal() {
       console.error(e);
       useEditorStore.getState().setExporting(false);
       setState({ phase: 'error', progress: 0, result: null, error: String(e?.message || e) });
+    } finally {
+      nativeKeepScreenOn(false);
+    }
+  };
+
+  const saveNative = async (share) => {
+    setSaveState({ busy: true, share });
+    try {
+      const r = await saveBlobNative(state.result.blob, fileName, { gallery: !share, share });
+      if (!r.ok) throw new Error(r.error || 'falha');
+      setSaveState({ done: true, share, location: r.location });
+    } catch (e) {
+      setSaveState({ error: String(e?.message || e) });
     }
   };
 
@@ -61,15 +79,30 @@ export default function ExportModal() {
             </div>
           </div>
           <video src={state.result.url} controls className="w-full max-h-64 rounded-lg bg-black" />
-          <a href={state.result.url} download={fileName} className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-brand text-ink-950 font-bold text-[13px] hover:brightness-110">
-            <Download size={16} /> Baixar {fileName}
-          </a>
+          {isNativeApp ? (
+            <div className="space-y-2">
+              <div className="flex flex-wrap justify-center gap-2">
+                <Button variant="primary" icon={saveState?.busy && !saveState.share ? LoaderCircle : Images} disabled={saveState?.busy} onClick={() => saveNative(false)}>
+                  Salvar na galeria
+                </Button>
+                <Button variant="secondary" icon={saveState?.busy && saveState.share ? LoaderCircle : Share2} disabled={saveState?.busy} onClick={() => saveNative(true)}>
+                  Compartilhar
+                </Button>
+              </div>
+              {saveState?.done && !saveState.share && <div className="text-[12px] text-emerald-300">Salvo em {saveState.location || 'Filmes/MotionCut'}</div>}
+              {saveState?.error && <div className="text-[12px] text-red-300">Erro: {saveState.error}</div>}
+            </div>
+          ) : (
+            <a href={state.result.url} download={fileName} className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-brand text-ink-950 font-bold text-[13px] hover:brightness-110">
+              <Download size={16} /> Baixar {fileName}
+            </a>
+          )}
         </div>
       ) : (
         <div className="space-y-5">
           <div>
             <div className="text-[12px] font-semibold text-ink-100 mb-2">Resolução</div>
-            <div className="grid grid-cols-4 gap-2">
+            <div className="grid grid-cols-4 max-[640px]:grid-cols-2 gap-2">
               {RESOLUTIONS.map((x) => {
                 const fs = frameSize(project.aspect, x.short);
                 return (
@@ -91,7 +124,7 @@ export default function ExportModal() {
               })}
             </div>
           </div>
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-2 max-[640px]:grid-cols-1 gap-4">
             <div>
               <div className="text-[12px] font-semibold text-ink-100 mb-2">Taxa de quadros</div>
               <div className="flex gap-2">
@@ -117,7 +150,7 @@ export default function ExportModal() {
             <Film size={18} className="text-brand shrink-0" />
             <div className="flex-1">
               Duração <span className="text-white font-mono">{formatTime(duration)}</span> · tamanho estimado <span className="text-white">~{fmtBytes(est)}</span>
-              <div className="text-[11px] text-ink-400 mt-0.5">A renderização acontece em tempo real; mantenha esta aba visível. Em 4K o desempenho depende do seu computador.</div>
+              <div className="text-[11px] text-ink-400 mt-0.5">A renderização acontece em tempo real; mantenha o app/aba aberto e visível. Em 4K o desempenho depende do aparelho.</div>
             </div>
           </div>
           {state.phase === 'running' && (
