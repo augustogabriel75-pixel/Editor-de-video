@@ -1,0 +1,137 @@
+@import "tailwindcss";
+
+@theme {
+  --color-ink-950: #06070a;
+  --color-ink-900: #0a0c11;
+  --color-ink-850: #0e1117;
+  --color-ink-800: #12161e;
+  --color-ink-750: #171b25;
+  --color-ink-700: #1c212c;
+  --color-ink-600: #262c39;
+  --color-ink-500: #353c4c;
+  --color-ink-400: #586174;
+  --color-ink-300: #8a93a7;
+  --color-ink-200: #b9c0cf;
+  --color-ink-100: #e7e9ef;
+  --color-brand: #22d3ee;
+  --color-brand-strong: #06b6d4;
+  --color-ai: #a855f7;
+  --color-ai-soft: #c084fc;
+  --color-hot: #ec4899;
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, monospace;
+  --animate-shimmer: shimmer 2.4s linear infinite;
+  --animate-pulse-glow: pulse-glow 1.8s ease-in-out infinite;
+  --animate-float: float 3s ease-in-out infinite;
+
+  @keyframes shimmer {
+    0% { background-position: -200% 0; }
+    100% { background-position: 200% 0; }
+  }
+  @keyframes pulse-glow {
+    0%, 100% { box-shadow: 0 0 0 0 rgb(168 85 247 / 0.55), 0 0 12px rgb(168 85 247 / 0.35); }
+    50% { box-shadow: 0 0 0 4px rgb(168 85 247 / 0), 0 0 22px rgb(236 72 153 / 0.55); }
+  }
+  @keyframes float {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-3px); }
+  }
+}
+
+html, body, #root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--color-ink-950);
+  color: var(--color-ink-100);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  overflow: hidden;
+  user-select: none;
+}
+
+/* Scrollbars discretos */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-ink-500) transparent;
+}
+*::-webkit-scrollbar { width: 8px; height: 8px; }
+*::-webkit-scrollbar-thumb { background: var(--color-ink-500); border-radius: 8px; }
+*::-webkit-scrollbar-track { background: transparent; }
+
+input, textarea, select {
+  user-select: text;
+}
+
+/* Sliders */
+input[type="range"].mc-range {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 4px;
+  border-radius: 999px;
+  background: linear-gradient(to right, var(--color-brand) var(--fill, 50%), var(--color-ink-600) var(--fill, 50%));
+  outline: none;
+  cursor: pointer;
+}
+input[type="range"].mc-range::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 14px;
+  height: 14px;
+  border-radius: 999px;
+  background: #fff;
+  border: 2px solid var(--color-brand);
+  box-shadow: 0 0 0 3px rgb(34 211 238 / 0.18);
+}
+input[type="range"].mc-range::-moz-range-thumb {
+  width: 12px;
+  height: 12px;
+  border-radius: 999px;
+  background: #fff;
+  border: 2px solid var(--color-brand);
+}
+input[type="range"].mc-range.ai {
+  background: linear-gradient(to right, var(--color-ai) var(--fill, 50%), var(--color-ink-600) var(--fill, 50%));
+}
+input[type="range"].mc-range.ai::-webkit-slider-thumb { border-color: var(--color-ai); box-shadow: 0 0 0 3px rgb(168 85 247 / 0.2); }
+
+input[type="color"].mc-color {
+  -webkit-appearance: none;
+  border: none;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border-radius: 8px;
+  background: none;
+  cursor: pointer;
+}
+input[type="color"].mc-color::-webkit-color-swatch-wrapper { padding: 0; }
+input[type="color"].mc-color::-webkit-color-swatch { border: 1px solid var(--color-ink-500); border-radius: 8px; }
+
+/* Brilho dos itens de IA */
+.ai-gradient {
+  background-image: linear-gradient(110deg, #7c3aed 0%, #a855f7 25%, #ec4899 50%, #a855f7 75%, #7c3aed 100%);
+  background-size: 200% 100%;
+}
+.ai-shimmer {
+  background-image: linear-gradient(110deg, rgb(255 255 255 / 0) 30%, rgb(255 255 255 / 0.28) 50%, rgb(255 255 255 / 0) 70%);
+  background-size: 200% 100%;
+  animation: var(--animate-shimmer);
+}
+.ai-text {
+  background-image: linear-gradient(90deg, #22d3ee, #a855f7, #ec4899);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+.checker {
+  background-color: #1a1d24;
+  background-image:
+    linear-gradient(45deg, #23272f 25%, transparent 25%),
+    linear-gradient(-45deg, #23272f 25%, transparent 25%),
+    linear-gradient(45deg, transparent 75%, #23272f 75%),
+    linear-gradient(-45deg, transparent 75%, #23272f 75%);
+  background-size: 16px 16px;
+  background-position: 0 0, 0 8px, 8px -8px, -8px 0;
+}
