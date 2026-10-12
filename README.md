@@ -4,6 +4,15 @@ Editor de vídeo gratuito que roda no navegador, com interface inspirada no CapC
 
 ![MotionCut](docs/screenshot.jpg)
 
+### Usar no PC
+
+Há três formas de abrir o editor no computador. Use Chrome ou Edge atualizados.
+
+1. **Link online, sem instalar nada:** https://augustogabriel75-pixel.github.io/Editor-de-video/
+   O site é publicado automaticamente a cada push pelo workflow `pages.yml`. Na primeira vez é preciso ativar o GitHub Pages: no repositório, vá em *Settings → Pages → Build and deployment → Source* e escolha **GitHub Actions**. Depois, rode o workflow em *Actions → "Site (GitHub Pages) + arquivo offline" → Run workflow*.
+2. **Arquivo único offline (`MotionCut.html`):** baixe o arquivo e dê dois cliques. Ele abre no navegador e funciona sem internet. Para gerar: `npm run build:single`, que cria `dist-single/MotionCut.html`. O CI também anexa esse arquivo como artefato "MotionCut-offline-html".
+3. **Rodar localmente (para desenvolver):** instale o [Node.js LTS](https://nodejs.org) e dê dois cliques em `Iniciar-MotionCut.bat` (Windows) ou rode `./iniciar-motioncut.sh` (macOS/Linux). Também dá para rodar direto:
+
 ```bash
 npm install
 npm run dev        # http://localhost:5173
