@@ -2,6 +2,7 @@
 import { uid } from './utils';
 import { decodeToMono } from '../ai/audioAnalysis';
 import { computePeaks } from '../audio/synth';
+import { putMedia, storageAvailable } from './projectStore';
 
 function loadVideoMeta(src) {
   return new Promise((resolve) => {
@@ -45,7 +46,10 @@ export async function importFiles(files) {
   const out = [];
   for (const file of files) {
     const src = URL.createObjectURL(file);
-    const base = { id: uid('asset'), name: file.name.replace(/\.[^.]+$/, ''), src, imported: true, category: 'Importado', size: file.size };
+    const id = uid('asset');
+    const base = { id, mediaKey: id, name: file.name.replace(/\.[^.]+$/, ''), src, imported: true, category: 'Importado', size: file.size, mime: file.type };
+    // guarda o arquivo no aparelho para o projeto poder ser reaberto depois
+    if (storageAvailable()) putMedia(id, file).catch((e) => console.warn('não foi possível salvar a mídia', e));
     if (file.type.startsWith('video/')) {
       const meta = await loadVideoMeta(src);
       if (!meta) continue;

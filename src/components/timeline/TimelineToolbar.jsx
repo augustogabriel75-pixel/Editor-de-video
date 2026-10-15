@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Scissors, Trash2, Copy, Diamond, Gauge, Captions, WandSparkles, Magnet, ZoomIn, ZoomOut, Maximize2, LoaderCircle, ScissorsLineDashed, ChevronDown } from 'lucide-react';
+import { Scissors, Trash2, Copy, Diamond, Gauge, Captions, WandSparkles, Magnet, ZoomIn, ZoomOut, Maximize2, LoaderCircle, ScissorsLineDashed, ChevronDown, AudioLines } from 'lucide-react';
 import { useEditorStore } from '../../store/useEditorStore';
 import { IconButton, cx } from '../ui/primitives';
 
@@ -79,6 +79,8 @@ export default function TimelineToolbar({ onFit, compact = false }) {
   const hasAnalysis = useEditorStore((s) => !!s.ai.analysis);
   const busy = useEditorStore((s) => s.ai.status === 'analyzing');
   const hasSel = useEditorStore((s) => !!s.selectedClipId);
+  const selIsVideo = useEditorStore((s) => s.clips.find((c) => c.id === s.selectedClipId)?.kind === 'video');
+  const extractAudio = useEditorStore((s) => s.extractAudio);
   const snapping = useEditorStore((s) => s.snapping);
   const toggleSnap = useEditorStore((s) => s.toggleSnapping);
   const pps = useEditorStore((s) => s.pxPerSec);
@@ -93,6 +95,7 @@ export default function TimelineToolbar({ onFit, compact = false }) {
       <ToolButton icon={Diamond} label="Keyframe" shortcut="K" onClick={addKf} disabled={!hasSel} />
       <SpeedMenu />
       <div className="w-px h-5 bg-ink-700 mx-1" />
+      <ToolButton icon={AudioLines} label="Extrair áudio" onClick={() => extractAudio()} disabled={!selIsVideo} />
       <ToolButton icon={Captions} label="Auto-Legendas" onClick={() => openModal('captions')} />
       <ToolButton icon={ScissorsLineDashed} label="Auto Cut" onClick={() => autoCut()} />
       <button

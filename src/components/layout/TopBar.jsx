@@ -1,4 +1,4 @@
-import { Undo2, Redo2, Download, Sparkles, LoaderCircle, Keyboard, Cpu, Check } from 'lucide-react';
+import { Undo2, Redo2, Download, Sparkles, LoaderCircle, Keyboard, Cpu, Check, ChevronLeft, Save, CloudCheck } from 'lucide-react';
 import { useEditorStore } from '../../store/useEditorStore';
 import { IconButton, cx } from '../ui/primitives';
 
@@ -65,6 +65,33 @@ function AIRenderIndicator({ compact = false }) {
   );
 }
 
+function SaveStatus({ compact }) {
+  const st = useEditorStore((s) => s.saveState);
+  const save = useEditorStore((s) => s.saveProject);
+  const label = st === 'saving' ? 'Salvando…' : st === 'dirty' ? 'Salvar' : st === 'error' ? 'Erro ao salvar' : 'Salvo';
+  return (
+    <button
+      type="button"
+      onClick={save}
+      title="Salvar projeto (Ctrl+S) — salva automaticamente"
+      className={cx('shrink-0 flex items-center gap-1 rounded-md text-[11px] px-1.5 h-7', st === 'error' ? 'text-red-300' : st === 'dirty' ? 'text-amber-200 hover:bg-ink-700' : 'text-ink-300 hover:bg-ink-700')}
+    >
+      {st === 'saving' ? <LoaderCircle size={14} className="animate-spin" /> : st === 'dirty' ? <Save size={14} /> : <CloudCheck size={14} />}
+      {!compact && <span>{label}</span>}
+    </button>
+  );
+}
+
+function HomeButton({ compact }) {
+  const goHome = useEditorStore((s) => s.goHome);
+  return (
+    <button type="button" onClick={goHome} title="Meus projetos" className="shrink-0 flex items-center gap-0.5 h-8 pl-1 pr-2 rounded-lg text-ink-200 hover:bg-ink-700 hover:text-white text-[12px] font-medium">
+      <ChevronLeft size={18} />
+      {!compact && 'Projetos'}
+    </button>
+  );
+}
+
 export default function TopBar({ compact = false }) {
   const title = useEditorStore((s) => s.project.title);
   const setProject = useEditorStore((s) => s.setProject);
@@ -76,19 +103,8 @@ export default function TopBar({ compact = false }) {
 
   if (compact) {
     return (
-      <header className="h-11 shrink-0 flex items-center gap-1.5 pl-2 pr-1.5 bg-ink-900 border-b border-ink-700">
-        <div className="w-7 h-7 shrink-0 rounded-lg bg-ink-950 border border-ink-600 flex items-center justify-center">
-          <svg viewBox="0 0 64 64" className="w-5 h-5">
-            <defs>
-              <linearGradient id="mcgm" x1="0" y1="0" x2="1" y2="1">
-                <stop offset="0" stopColor="#22d3ee" />
-                <stop offset="1" stopColor="#a855f7" />
-              </linearGradient>
-            </defs>
-            <path d="M12 48V16l12 15 12-15v32" fill="none" stroke="url(#mcgm)" strokeWidth="7" strokeLinecap="round" strokeLinejoin="round" />
-            <path d="M43 22l10-5v30l-10-5z" fill="url(#mcgm)" />
-          </svg>
-        </div>
+      <header className="h-11 shrink-0 flex items-center gap-1 pl-0.5 pr-1.5 bg-ink-900 border-b border-ink-700">
+        <HomeButton compact />
         <input
           value={title}
           onChange={(e) => setProject({ title: e.target.value }, 'title')}
@@ -97,6 +113,7 @@ export default function TopBar({ compact = false }) {
         />
         <IconButton icon={Undo2} label="Desfazer" onClick={undo} disabled={!canUndo} />
         <IconButton icon={Redo2} label="Refazer" onClick={redo} disabled={!canRedo} />
+        <SaveStatus compact />
         <AIRenderIndicator compact />
         <button
           type="button"
@@ -112,6 +129,7 @@ export default function TopBar({ compact = false }) {
 
   return (
     <header className="h-12 shrink-0 flex items-center gap-3 px-3 bg-ink-900 border-b border-ink-700">
+      <HomeButton />
       <div className="flex items-center gap-2 pr-2">
         <div className="relative w-8 h-8 rounded-xl bg-ink-950 border border-ink-600 flex items-center justify-center overflow-hidden">
           <svg viewBox="0 0 64 64" className="w-6 h-6">
@@ -145,6 +163,7 @@ export default function TopBar({ compact = false }) {
       <div className="flex items-center gap-0.5">
         <IconButton icon={Undo2} label="Desfazer (Ctrl+Z)" onClick={undo} disabled={!canUndo} />
         <IconButton icon={Redo2} label="Refazer (Ctrl+Shift+Z)" onClick={redo} disabled={!canRedo} />
+        <SaveStatus />
       </div>
 
       <div className="flex-1" />

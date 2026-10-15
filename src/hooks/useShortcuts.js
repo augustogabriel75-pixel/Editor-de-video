@@ -8,7 +8,7 @@ export function useShortcuts() {
       const tag = e.target?.tagName;
       if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || e.target?.isContentEditable) return;
       const s = useEditorStore.getState();
-      if (s.modal || s.exporting) return;
+      if (s.modal || s.exporting || s.screen !== 'editor') return;
       const mod = e.ctrlKey || e.metaKey;
       const k = e.key.toLowerCase();
       if (k === ' ') {
@@ -18,6 +18,10 @@ export function useShortcuts() {
         e.preventDefault();
         if (e.shiftKey) s.redo();
         else s.undo();
+      } else if (mod && k === 's') {
+        e.preventDefault();
+        s.saveProject();
+        s.toast('Projeto salvo', 'success');
       } else if (mod && k === 'y') {
         e.preventDefault();
         s.redo();

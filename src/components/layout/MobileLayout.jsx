@@ -71,7 +71,8 @@ export default function MobileLayout() {
         s.select(null);
         return true;
       }
-      return false;
+      s.goHome();
+      return true;
     };
   }, []);
 

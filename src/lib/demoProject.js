@@ -17,7 +17,10 @@ export const DEFAULT_TRACKS = [
   { id: 'trk-sfx', short: 'SFX', kind: 'audio', name: 'Efeitos Sonoros', height: 32 },
 ].map((t) => ({ muted: false, hidden: false, locked: false, ...t }));
 
+let libraryCache = null;
+
 export function createLibraryAssets() {
+  if (libraryCache) return libraryCache;
   const demo = DEMO_ASSETS.map((a) => {
     let thumb = null;
     try {
@@ -38,7 +41,18 @@ export function createLibraryAssets() {
   };
   const music = MUSIC_LIBRARY.map((m) => ({ id: `music-${m.id}`, type: 'audio', name: m.name, duration: m.duration, synth: { kind: 'music', id: m.id }, bpm: m.bpm, mood: m.mood, colors: m.colors, category: 'Música' }));
   const sfx = SFX_LIBRARY.map((m) => ({ id: `sfx-${m.id}`, type: 'audio', name: m.name, duration: m.duration, synth: { kind: 'sfx', id: m.id }, colors: m.colors, category: 'Efeitos Sonoros' }));
-  return [...demo, narration, ...music, ...sfx];
+  libraryCache = [...demo, narration, ...music, ...sfx];
+  return libraryCache;
+}
+
+/** Projeto em branco (sem clipes), só com a biblioteca de mídia. */
+export function createBlankProject({ title = 'Novo projeto', aspect = '16:9' } = {}) {
+  return {
+    project: { title, aspect, background: { mode: 'blur', color: '#000000' } },
+    tracks: DEFAULT_TRACKS,
+    clips: [],
+    assets: createLibraryAssets(),
+  };
 }
 
 export function createDemoProject() {

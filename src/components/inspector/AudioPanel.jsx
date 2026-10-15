@@ -1,10 +1,12 @@
-import { Volume2, Waves, Mic } from 'lucide-react';
+import { Volume2, Waves, Mic, AudioLines, Download } from 'lucide-react';
 import { useEditorStore } from '../../store/useEditorStore';
-import { Section, Slider, Toggle } from '../ui/primitives';
+import { Section, Slider, Toggle, Button } from '../ui/primitives';
 
 export default function AudioPanel({ clip }) {
   const updateDeep = useEditorStore((s) => s.updateClipDeep);
   const asset = useEditorStore((s) => s.assets.find((a) => a.id === clip.assetId));
+  const extractAudio = useEditorStore((s) => s.extractAudio);
+  const saveClipAudio = useEditorStore((s) => s.saveClipAudio);
   const a = clip.audio;
   const k = (p) => `aud:${clip.id}:${p}`;
   const maxFade = Math.max(0.1, Math.min(5, clip.duration / 2));
@@ -18,6 +20,17 @@ export default function AudioPanel({ clip }) {
           <Slider label="Fade out" value={Math.min(a.fadeOut, maxFade)} min={0} max={maxFade} step={0.1} suffix="s" format={(v) => v.toFixed(1)} onChange={(v) => updateDeep(clip.id, 'audio', { fadeOut: v }, k('fo'))} />
         </div>
       </Section>
+      {asset && (asset.src || asset.synth) && (
+        <Section title={clip.kind === 'video' ? 'Extrair áudio do vídeo' : 'Exportar áudio'} icon={AudioLines}>
+          {clip.kind === 'video' && (
+            <>
+              <p className="text-[11px] text-ink-300 leading-snug">Separa o som deste vídeo numa faixa de áudio própria na timeline (o vídeo fica mudo), para editar, cortar ou trocar a voz/música independentemente.</p>
+              <Button icon={AudioLines} variant="primary" className="w-full" onClick={() => extractAudio(clip.id)}>Extrair áudio para a timeline</Button>
+            </>
+          )}
+          <Button icon={Download} className="w-full" onClick={() => saveClipAudio(clip.id)}>Salvar áudio (.wav)</Button>
+        </Section>
+      )}
       <Section title="Redução de Ruído" icon={Waves}>
         <Toggle checked={a.denoise} onChange={(denoise) => updateDeep(clip.id, 'audio', { denoise })} label="Reduzir ruído" description="Remove zumbido grave, chiado agudo e equilibra a voz (filtros + compressor)." />
         {a.denoise && <Slider label="Intensidade" value={a.denoiseLevel} min={0} max={100} suffix="%" onChange={(v) => updateDeep(clip.id, 'audio', { denoiseLevel: v }, k('dn'))} />}

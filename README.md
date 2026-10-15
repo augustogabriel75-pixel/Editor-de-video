@@ -45,7 +45,13 @@ No celular, o editor tem esta disposição:
 
 ---
 
-## 1. Interface (layout estilo CapCut)
+## 0. Projetos e salvamento
+
+- O app abre na tela **Projetos**, não no exemplo. Dali você pode criar um **Novo projeto** (nome, formato 16:9 / 9:16 / 1:1 / 4:5, importar mídia ou começar vazio) ou **Abrir exemplo** (o projeto demonstrativo).
+- **Meus projetos** lista tudo o que você já começou, com miniatura, formato, duração e data. Toque para continuar de onde parou. O menu **⋮** tem Renomear, Duplicar e Excluir.
+- **Salvamento automático**: cada alteração é salva sozinha no aparelho (IndexedDB) cerca de 1,5 s depois. Também salva ao sair do app ou trocar de aba. O indicador na barra superior mostra *Salvando… / Salvo*; clique nele ou use `Ctrl+S` para salvar na hora. Os arquivos importados (vídeos, fotos, áudios) ficam guardados junto, então o projeto reabre completo mesmo depois de fechar o app.
+- **‹ Projetos** (canto superior esquerdo), ou o botão Voltar do Android, salva e volta para a lista.
+
 
 | Área | O que tem |
 | --- | --- |
@@ -88,6 +94,7 @@ A interface tem:
 - **Velocidade**: velocidade constante de 0,1x a 10x e **curvas de velocidade** (Montagem, **Montanha-russa**, **Bate-estaca**, Herói, Bala, Salto, Flash In/Out) com editor de pontos arrastáveis. O remapeamento vale para o vídeo e para o áudio (playbackRate automatizado).
 - **Biblioteca de efeitos**: glitch, separação RGB, VHS, pixelizar, zoom pulsante, tremor, zoom radial, flash, estroboscópio, desfoque, glow, granulado, filme antigo, vinheta, vazamento de luz, bokeh e espelho.
 - **13 transições**, **16 filtros** com intensidade, **animações** de entrada, saída e loop, **keyframes** (posição, escala, rotação e opacidade), modos de mistura no PIP, estilos de texto e modelos animados.
+- **Extrair áudio do vídeo**: selecione um clipe de vídeo e use **Extrair áudio** na barra da timeline (ou Inspetor → Áudio → *Extrair áudio para a timeline*). O som vai para uma trilha de áudio própria (Narração, Música ou SFX, a que estiver livre), alinhado e com o mesmo corte e velocidade, e o vídeo fica mudo. **Salvar áudio (.wav)** grava o áudio de qualquer clipe como arquivo WAV (no Android vai para *Downloads/MotionCut*).
 - **Exportação real** em 720p, 1080p, 2K ou **4K**, a 24, 30 ou 60 fps, em MP4 ou WebM, com o áudio mixado e sem marca d'água.
 
 ## 4. Arquitetura
@@ -142,4 +149,4 @@ scripts/build-apk.sh          # Build do APK (aapt2 → javac → dx/d8 → zipa
 
 ## 6. Atalhos
 
-`Espaço` reproduzir/pausar · `←/→` um quadro (com `Shift`, 1 s) · `S` ou `Ctrl+B` dividir · `Del` excluir · `Ctrl+D` duplicar · `K` keyframe · `Ctrl+Z` / `Ctrl+Shift+Z` desfazer/refazer · `+`/`−` zoom · `G` gerar Motion IA · `Esc` limpar seleção.
+`Espaço` reproduzir/pausar · `←/→` um quadro (com `Shift`, 1 s) · `S` ou `Ctrl+B` dividir · `Del` excluir · `Ctrl+D` duplicar · `K` keyframe · `Ctrl+Z` / `Ctrl+Shift+Z` desfazer/refazer · `+`/`−` zoom · `G` gerar Motion IA · `Esc` limpar seleção · `Ctrl+S` salvar projeto.

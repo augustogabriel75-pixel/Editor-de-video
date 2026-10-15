@@ -8,7 +8,10 @@
 import { create } from 'zustand';
 import { subscribeWithSelector } from 'zustand/middleware';
 import { clamp, uid, FRAME, snapToFrame, isActiveAt } from '../lib/utils';
-import { createDemoProject } from '../lib/demoProject';
+import { createDemoProject, createBlankProject, createLibraryAssets } from '../lib/demoProject';
+import { saveProjectRecord, loadProjectRecord, listProjects, deleteProjectRecord, getMedia, storageAvailable } from '../lib/projectStore';
+import { clipAudioToWav } from '../lib/audioExport';
+import { isNativeApp, saveBlobNative } from '../lib/native';
 import {
   accepts,
   clipKindForAsset,
@@ -33,7 +36,7 @@ import { buildCaptionChunks } from '../ai/captionGenerator';
 import { mergeStyles } from '../engine/motionStyles';
 import { getTemplate } from '../engine/motionTemplates';
 
-const demo = createDemoProject();
+const demo = createBlankProject();
 
 const DEFAULT_PROMPT = 'Gere um motion estilo minimalista futurista para a fala atual';
 
@@ -149,8 +152,42 @@ export const useEditorStore = create(
       }, 110);
     };
 
+    /** Carrega um projeto no editor (zera histórico, seleção, reprodução e IA). */
+    const loadIntoStore = (data, id, { createdAt = Date.now(), leftTab = 'media' } = {}) => {
+      clearInterval(renderTimer);
+      historyKey = null;
+      const s = get();
+      set({
+        screen: 'editor',
+        currentProjectId: id,
+        projectCreatedAt: createdAt,
+        saveState: 'saved',
+        project: data.project,
+        tracks: data.tracks,
+        clips: data.clips,
+        assets: data.assets,
+        duration: computeDuration(data.clips),
+        isPlaying: false,
+        currentTime: 0,
+        seekNonce: s.seekNonce + 1,
+        selectedClipId: null,
+        inspectorTab: null,
+        modal: null,
+        past: [],
+        future: [],
+        leftTab,
+        ai: { ...initialAI, options: s.ai.options, prompt: s.ai.prompt, analysis: data.analysis || null, status: data.analysis ? 'ready' : 'idle' },
+      });
+    };
+
     /* ---------------------------------------------------------------- estado + ações */
     return {
+      screen: 'home',
+      currentProjectId: null,
+      saveState: 'idle',
+      lastSavedAt: null,
+      projectList: [],
+
       project: demo.project,
       tracks: demo.tracks,
       clips: demo.clips,
@@ -164,7 +201,7 @@ export const useEditorStore = create(
       exporting: false,
 
       selectedClipId: null,
-      leftTab: 'ai',
+      leftTab: 'media',
       inspectorTab: null,
       pxPerSec: 44,
       snapping: true,
@@ -176,6 +213,165 @@ export const useEditorStore = create(
       future: [],
 
       ai: initialAI,
+
+      /* ---------- projetos (tela inicial, salvar, abrir) */
+      refreshProjects: async () => {
+        if (!storageAvailable()) return;
+        try {
+          set({ projectList: await listProjects() });
+        } catch (e) {
+          console.warn(e);
+        }
+      },
+
+      newProject: ({ title = 'Novo projeto', aspect = '16:9' } = {}) => {
+        loadIntoStore(createBlankProject({ title, aspect }), uid('proj'), { leftTab: 'media' });
+        get().saveProject();
+      },
+
+      openDemo: () => {
+        const d = createDemoProject();
+        d.project.title = 'Exemplo · Como ganhar dinheiro online';
+        loadIntoStore(d, uid('proj'), { leftTab: 'ai' });
+        get().saveProject();
+      },
+
+      openProject: async (id) => {
+        const rec = await loadProjectRecord(id);
+        if (!rec) return toast('Projeto não encontrado', 'error');
+        let missing = 0;
+        const imported = [];
+        for (const a of rec.assets || []) {
+          const blob = a.mediaKey ? await getMedia(a.mediaKey) : null;
+          if (!blob) missing++;
+          imported.push({ ...a, src: blob ? URL.createObjectURL(blob) : null, missing: !blob });
+        }
+        loadIntoStore({ project: rec.project, tracks: rec.tracks, clips: rec.clips, assets: [...imported, ...createLibraryAssets()], analysis: rec.analysis }, rec.id, { createdAt: rec.createdAt, leftTab: 'media' });
+        if (missing) toast(`${missing} mídia(s) deste projeto não foram encontradas no aparelho`, 'warn');
+      },
+
+      saveProject: async () => {
+        const s = get();
+        if (!s.currentProjectId || !storageAvailable()) return;
+        set({ saveState: 'saving' });
+        try {
+          const visual = s.clips.filter((c) => c.kind === 'video' || c.kind === 'image').sort((a, b) => a.start - b.start)[0];
+          const thumb = visual ? s.assets.find((a) => a.id === visual.assetId)?.thumb || null : null;
+          const now = Date.now();
+          await saveProjectRecord({
+            id: s.currentProjectId,
+            title: s.project.title || 'Sem título',
+            aspect: s.project.aspect,
+            createdAt: s.projectCreatedAt || now,
+            updatedAt: now,
+            duration: s.clips.length ? s.duration : 0,
+            clipCount: s.clips.length,
+            thumb,
+            project: s.project,
+            tracks: s.tracks,
+            clips: s.clips,
+            assets: s.assets.filter((a) => a.imported).map(({ src, missing, ...rest }) => rest),
+            analysis: s.ai.analysis,
+          });
+          if (get().currentProjectId === s.currentProjectId) set({ saveState: 'saved', lastSavedAt: now });
+        } catch (e) {
+          console.error(e);
+          set({ saveState: 'error' });
+          toast('Não foi possível salvar o projeto (armazenamento cheio?)', 'error');
+        }
+      },
+
+      goHome: async () => {
+        set({ isPlaying: false });
+        await get().saveProject();
+        set({ screen: 'home', modal: null, selectedClipId: null });
+        get().refreshProjects();
+      },
+
+      deleteProject: async (id) => {
+        await deleteProjectRecord(id);
+        get().refreshProjects();
+      },
+
+      renameProject: async (id, title) => {
+        const rec = await loadProjectRecord(id);
+        if (!rec) return;
+        await saveProjectRecord({ ...rec, title, project: { ...rec.project, title }, updatedAt: Date.now() });
+        get().refreshProjects();
+      },
+
+      duplicateProject: async (id) => {
+        const rec = await loadProjectRecord(id);
+        if (!rec) return;
+        const title = `${rec.title} (cópia)`;
+        await saveProjectRecord({ ...rec, id: uid('proj'), title, project: { ...rec.project, title }, createdAt: Date.now(), updatedAt: Date.now() });
+        get().refreshProjects();
+      },
+
+      /* ---------- extrair áudio */
+      extractAudio: (clipId) => {
+        const s = get();
+        const c = clipById(clipId || s.selectedClipId);
+        if (!c || c.kind !== 'video') return toast('Selecione um clipe de vídeo', 'warn');
+        const asset = s.assets.find((a) => a.id === c.assetId);
+        if (!asset?.hasAudio || !asset.src) return toast('Este vídeo não tem áudio para extrair', 'warn');
+        let audioAsset = s.assets.find((a) => a.derivedFrom === asset.id);
+        const newAsset = !audioAsset;
+        if (!audioAsset) {
+          audioAsset = { id: uid('asset'), type: 'audio', name: `${asset.name} · áudio`, src: asset.src, mediaKey: asset.mediaKey, duration: asset.duration, peaks: asset.peaks, imported: true, category: 'Voz', derivedFrom: asset.id };
+        }
+        const free = (tid) => !onTrack(tid).some((x) => x.start < c.start + c.duration - 1e-3 && x.start + x.duration > c.start + 1e-3);
+        const trackId = ['trk-voice', 'trk-music', 'trk-sfx'].find(free);
+        if (!trackId) return toast('Libere espaço numa trilha de áudio no mesmo trecho do vídeo', 'warn');
+        const track = trackById(trackId);
+        const clip = {
+          ...mediaClip(audioAsset, track, c.start),
+          name: audioAsset.name,
+          trimIn: c.trimIn,
+          duration: c.duration,
+          sourceDuration: asset.duration,
+          speed: c.speed,
+          speedCurve: c.speedCurve,
+          audio: { ...c.audio, muted: false, demoVoice: false },
+        };
+        checkpoint();
+        if (newAsset) set((st) => ({ assets: [audioAsset, ...st.assets] }));
+        commitClips(
+          [...get().clips.map((x) => (x.id === c.id ? { ...x, audio: { ...x.audio, muted: true } } : x)), clip],
+          { selectedClipId: clip.id },
+        );
+        toast(`🎵 Áudio extraído para “${track.name}” (o vídeo foi silenciado)`, 'success');
+      },
+
+      saveClipAudio: async (clipId) => {
+        const s = get();
+        const c = clipById(clipId || s.selectedClipId);
+        if (!c) return;
+        const asset = s.assets.find((a) => a.id === c.assetId);
+        if (!asset || !(asset.type === 'audio' || asset.hasAudio) || (!asset.src && !asset.synth)) return toast('Este clipe não tem áudio', 'warn');
+        toast('Gerando arquivo de áudio…');
+        try {
+          const blob = await clipAudioToWav(asset, c);
+          const name = `${(c.name || 'audio').replace(/[^\p{L}\p{N}\- ]+/gu, '').replace(/\s+/g, ' ').trim() || 'audio'}.wav`;
+          if (isNativeApp) {
+            const r = await saveBlobNative(blob, name, { gallery: true });
+            toast(r.ok ? `Áudio salvo em ${r.location || 'Downloads/MotionCut'}` : `Falha: ${r.error}`, r.ok ? 'success' : 'error');
+          } else {
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = name;
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+            setTimeout(() => URL.revokeObjectURL(url), 10000);
+            toast(`Áudio “${name}” baixado`, 'success');
+          }
+        } catch (e) {
+          console.error(e);
+          toast('Não foi possível gerar o áudio', 'error');
+        }
+      },
 
       /* ---------- histórico */
       checkpoint,
@@ -719,3 +915,22 @@ export const useEditorStore = create(
 
 /* Seletores utilitários */
 export const selectSelectedClip = (s) => s.clips.find((c) => c.id === s.selectedClipId) || null;
+
+/* Salvamento automático: 1,5 s depois da última alteração no editor. */
+let autosaveTimer = null;
+const markDirty = () => {
+  const s = useEditorStore.getState();
+  if (s.screen !== 'editor' || !s.currentProjectId || s.exporting) return;
+  if (s.saveState !== 'dirty') useEditorStore.setState({ saveState: 'dirty' });
+  clearTimeout(autosaveTimer);
+  autosaveTimer = setTimeout(() => useEditorStore.getState().saveProject(), 1500);
+};
+useEditorStore.subscribe((s) => s.clips, markDirty);
+useEditorStore.subscribe((s) => s.tracks, markDirty);
+useEditorStore.subscribe((s) => s.project, markDirty);
+useEditorStore.subscribe((s) => s.assets, markDirty);
+useEditorStore.subscribe((s) => s.ai.analysis, markDirty);
+if (typeof window !== 'undefined') {
+  window.addEventListener('pagehide', () => useEditorStore.getState().saveProject());
+  document.addEventListener('visibilitychange', () => document.visibilityState === 'hidden' && useEditorStore.getState().saveProject());
+}

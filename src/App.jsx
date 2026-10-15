@@ -13,6 +13,7 @@ import ShortcutsModal from './components/modals/ShortcutsModal';
 import Toasts from './components/ui/Toasts';
 import MobileLayout from './components/layout/MobileLayout';
 import { useIsMobile } from './hooks/useIsMobile';
+import HomeScreen from './components/home/HomeScreen';
 
 function ResizeHandle({ onDrag }) {
   return (
@@ -37,6 +38,7 @@ function ResizeHandle({ onDrag }) {
 
 export default function App() {
   const modal = useEditorStore((s) => s.modal);
+  const screen = useEditorStore((s) => s.screen);
   const [tlH, setTlH] = useState(() => Math.round(Math.min(420, Math.max(300, window.innerHeight * 0.4))));
   const [base, setBase] = useState(tlH);
 
@@ -55,6 +57,15 @@ export default function App() {
       <Toasts />
     </>
   );
+
+  if (screen === 'home') {
+    return (
+      <>
+        <HomeScreen />
+        <Toasts />
+      </>
+    );
+  }
 
   if (mobile) {
     return (
