@@ -4,26 +4,31 @@ import { useEditorStore } from '../../store/useEditorStore';
 import { ASPECT_RATIOS } from '../../lib/catalog';
 import { formatTime } from '../../lib/utils';
 import { setMasterVolume } from '../../engine/audioEngine';
+import { useTimeSubscription } from '../../hooks/useTimeSubscription';
 import { IconButton, cx } from '../ui/primitives';
 import { isNativeApp } from '../../lib/native';
 
 const ASPECT_ICON = { '16:9': RectangleHorizontal, '9:16': Smartphone, '1:1': Square, '4:5': RectangleVertical };
 
 function TimeDisplay({ stacked = false }) {
-  const t = useEditorStore((s) => s.currentTime);
-  const d = useEditorStore((s) => s.duration);
+  const cur = useRef(null);
+  const tot = useRef(null);
+  useTimeSubscription((t, _pps, d) => {
+    if (cur.current) cur.current.textContent = formatTime(t);
+    if (tot.current) tot.current.textContent = stacked ? formatTime(d) : ` / ${formatTime(d)}`;
+  }, [stacked]);
   if (stacked) {
     return (
       <div className="font-mono tabular-nums">
-        <div className="text-brand">{formatTime(t)}</div>
-        <div className="text-ink-400">{formatTime(d)}</div>
+        <div ref={cur} className="text-brand" />
+        <div ref={tot} className="text-ink-400" />
       </div>
     );
   }
   return (
     <div className="font-mono text-[12px] tabular-nums">
-      <span className="text-brand">{formatTime(t)}</span>
-      <span className="text-ink-400"> / {formatTime(d)}</span>
+      <span ref={cur} className="text-brand" />
+      <span ref={tot} className="text-ink-400" />
     </div>
   );
 }

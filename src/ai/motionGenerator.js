@@ -71,7 +71,8 @@ function resolveLane(items, lane) {
  * @param analysis  saída de analyzeContext
  * @param opts      { options, spec (parsePrompt), aspect, mainClips, range }
  */
-export function generateMotions(analysis, { options, spec, aspect = '16:9', mainClips = [], range = null }) {
+export function generateMotions(analysis, opts) {
+  const { options, spec, aspect = '16:9', mainClips = [], range = null } = opts;
   const cats = {
     sticker: options.stickers && spec.categories.sticker,
     typography: options.typography && spec.categories.typography,
@@ -92,6 +93,7 @@ export function generateMotions(analysis, { options, spec, aspect = '16:9', main
 
   /* --- Stickers & tipografia (falas com palavras-chave) --- */
   let stickerN = 0;
+  let plainN = 0;
   const recent = [];
   const sentences = analysis.transcript.sentences.filter((s) => !range || (s.end >= range.start && s.start <= range.end));
   sentences.forEach((s) => {
@@ -109,11 +111,29 @@ export function generateMotions(analysis, { options, spec, aspect = '16:9', main
       if (!kw.forced && recent.some((r) => r.template === kw.template && Math.abs(r.t - kw.t) < 6)) continue;
       picks.push(kw);
     }
-    if (!picks.length && range && cats.sticker) picks.push({ template: 'sparkles', t: s.start + 0.2, word: null, sfx: 'ding', emphasis: 0.6 });
-    const useTypo = cats.typography && (!cats.sticker || !picks.length || s.index % 2 === 1 || k > 1.25 || !!range);
-    const useSticker = cats.sticker && picks.length && (!useTypo || k > 1.25 || !!range || !cats.typography);
-    if (!picks.length && !range && !useTypo) return;
-    if (!kws.length && !range) return;
+    // Frase sem palavra-chave do léxico: sticker genérico pelo tom da frase (pergunta, exclamação, números).
+    if (!picks.length && cats.sticker) {
+      const top = [...s.words].sort((a, b) => (b.emphasis ?? 0) - (a.emphasis ?? 0))[0];
+      const at = top ? top.start : s.start + 0.2;
+      const generic = /\?\s*$/.test(s.text) ? 'question' : /!\s*$/.test(s.text) ? (k > 1 ? 'lightning' : 'fire') : /\d/.test(s.text) ? 'chart-up' : range || plainN % 3 === 2 ? 'sparkles' : null;
+      if (generic && !recent.some((r) => r.template === generic && Math.abs(r.t - at) < 6)) {
+        const e = templateEntry(generic);
+        picks.push({ template: generic, t: at, word: null, sfx: e?.sfx || 'pop', emphasis: top?.emphasis ?? 0.6, generic: true, label: null });
+      }
+    }
+    if (!kws.length) plainN++;
+    const enoughWords = s.words.length >= 3;
+    const useTypo = cats.typography && enoughWords && (!cats.sticker || !picks.length || s.index % 2 === 1 || k > 1.25 || !!range || (!kws.length && plainN % 2 === 1));
+    const useSticker = cats.sticker && picks.length && (!useTypo || k > 1.25 || !!range || !cats.typography || !kws.length);
+    if (!useSticker && !useTypo) return;
+    // destaques da tipografia: palavras-chave ou, sem elas, as palavras mais enfatizadas da fala
+    const highlightWords = kws.length
+      ? kws.map((kw) => kw.norm).filter(Boolean)
+      : [...s.words]
+          .filter((w) => w.norm && w.norm.length >= 4 && !isStop(w.w))
+          .sort((a, b) => (b.emphasis ?? 0) - (a.emphasis ?? 0))
+          .slice(0, 2)
+          .map((w) => w.norm);
 
     if (useSticker) {
       picks.forEach((kw) => {
@@ -133,7 +153,7 @@ export function generateMotions(analysis, { options, spec, aspect = '16:9', main
             category: 'sticker',
             keyword: kw.word,
             label: kw.word ? capitalize(kw.word) : null,
-            reason: kw.forced ? `Pedido no prompt: “${kw.word}”` : `Palavra-chave “${kw.word}” falada em ${formatTime(kw.t)}`,
+            reason: kw.forced ? `Pedido no prompt: “${kw.word}”` : kw.generic ? `Tom da fala (${s.text.trim().slice(-1) === '?' ? 'pergunta' : s.text.trim().slice(-1) === '!' ? 'exclamação' : 'ênfase'}) em ${formatTime(kw.t)}` : `Palavra-chave “${kw.word}” falada em ${formatTime(kw.t)}`,
             confidence: clamp(0.8 + 0.17 * (kw.emphasis ?? 0.5), 0.5, 0.99),
           }),
         });
@@ -155,13 +175,71 @@ export function generateMotions(analysis, { options, spec, aspect = '16:9', main
           templateId: style.typography,
           category: 'typography',
           text,
-          highlights: kws.map((kw) => kw.norm).filter(Boolean),
-          reason: kws.length ? `Frase-chave com ${kws.length} destaque(s): ${kws.map((x) => x.word).join(', ')}` : 'Destaque da fala atual',
+          highlights: highlightWords,
+          reason: kws.length ? `Frase-chave com ${kws.length} destaque(s): ${kws.map((x) => x.word).join(', ')}` : `Frase de destaque da fala (ênfase da voz) em ${formatTime(s.start)}`,
           confidence: clamp(0.78 + 0.05 * kws.length, 0.5, 0.97),
         }),
       });
     }
   });
+
+  /* --- Sem fala: título de abertura, destaques no ritmo e chamada final --- */
+  if (!analysis.transcript.words.length) {
+    const dur = analysis.duration;
+    const title = (opts.title || '').trim();
+    if (cats.typography && title && inRange(0.3)) {
+      items.push({
+        lane: 'typography',
+        priority: 1,
+        start: 0.3,
+        duration: Math.min(3.2, Math.max(1.8, dur * 0.3)),
+        name: `Título · ${title.split(' ').slice(0, 3).join(' ')}`,
+        transform: { x: 0, y: portrait ? -0.3 : -0.28, scale: portrait ? 1.1 : 1, rotation: 0, opacity: 1 },
+        motion: motion({
+          templateId: style.typography,
+          category: 'typography',
+          text: title,
+          highlights: title.split(/\s+/).filter((w) => w.length >= 5 && !isStop(w)).slice(0, 2).map((w) => w.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]/g, '')),
+          reason: 'Título de abertura (vídeo sem fala)',
+          confidence: 0.8,
+        }),
+      });
+    }
+    if (cats.sticker) {
+      const pool = style.flat ? ['sparkles', 'lightning', 'stars'] : ['sparkles', 'fire', 'lightning', 'stars', 'music'];
+      const strong = [...(analysis.beats || [])].filter((b) => inRange(b.t) && b.t > 3.6 && b.t < dur - 4).sort((a, b) => b.strength - a.strength);
+      const chosen = [];
+      for (const b of strong) {
+        if (chosen.length >= Math.max(1, Math.round((dur / 8) * k))) break;
+        if (chosen.some((c) => Math.abs(c.t - b.t) < 5)) continue;
+        chosen.push(b);
+      }
+      chosen.sort((a, b) => a.t - b.t).forEach((b, i) => {
+        const tplId = pool[i % pool.length];
+        const side = i % 2 === 0 ? 1 : -1;
+        items.push({
+          lane: 'sticker',
+          priority: 2,
+          start: Math.max(0, b.t - 0.05),
+          duration: 1.8,
+          name: getTemplate(tplId).name,
+          transform: portrait ? { x: side * 0.16, y: -0.27, scale: 1, rotation: 0, opacity: 1 } : { x: side * 0.3, y: 0.02, scale: 0.95, rotation: 0, opacity: 1 },
+          motion: motion({ templateId: tplId, category: 'sticker', label: null, reason: `Destaque na batida forte (${formatTime(b.t)})`, confidence: 0.72 }),
+        });
+      });
+      if (dur > 8 && inRange(dur - 3)) {
+        items.push({
+          lane: 'sticker',
+          priority: 3,
+          start: Math.max(0, dur - 3.2),
+          duration: 2.8,
+          name: getTemplate('subscribe').name,
+          transform: portrait ? { x: 0, y: 0.18, scale: 1, rotation: 0, opacity: 1 } : { x: 0.28, y: 0.22, scale: 0.9, rotation: 0, opacity: 1 },
+          motion: motion({ templateId: 'subscribe', category: 'sticker', label: null, reason: 'Chamada para ação no final do vídeo', confidence: 0.8 }),
+        });
+      }
+    }
+  }
 
   /* --- Transições dinâmicas (cortes + batidas) --- */
   const transitionTimes = [];

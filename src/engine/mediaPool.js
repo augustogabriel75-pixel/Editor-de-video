@@ -69,3 +69,31 @@ export function endFrame() {
 export function pauseAll() {
   for (const el of videos.values()) if (!el.paused) el.pause();
 }
+
+/** Posiciona o vídeo exatamente em `t` e espera o quadro (usado na exportação quadro a quadro). */
+export function seekVideoExact(asset, t) {
+  const el = getVideo(asset);
+  return new Promise((resolve) => {
+    const go = () => {
+      const dur = Number.isFinite(el.duration) ? el.duration : asset.duration || 0;
+      const target = clamp(t, 0, Math.max(0, dur - 0.04));
+      if (!el.paused) el.pause();
+      if (el.readyState >= 2 && !el.seeking && Math.abs(el.currentTime - target) < 0.004) return resolve();
+      let finished = false;
+      const done = () => {
+        if (finished) return;
+        finished = true;
+        el.removeEventListener('seeked', done);
+        resolve();
+      };
+      el.addEventListener('seeked', done);
+      el.currentTime = target;
+      setTimeout(done, 2500);
+    };
+    if (el.readyState >= 1) go();
+    else {
+      el.addEventListener('loadedmetadata', go, { once: true });
+      setTimeout(go, 3000);
+    }
+  });
+}

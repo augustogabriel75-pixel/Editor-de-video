@@ -104,20 +104,20 @@ export function stopAll() {
   active = [];
 }
 
-function buildChain(clip) {
-  const gain = ctx.createGain();
+function buildChain(c, dest, clip) {
+  const gain = c.createGain();
   let input = gain;
   let out = gain;
   if (clip.audio?.denoise) {
     // Redução de ruído: corta rumble/hiss e comprime levemente (voz mais limpa).
     const lvl = (clip.audio.denoiseLevel ?? 60) / 100;
-    const hp = ctx.createBiquadFilter();
+    const hp = c.createBiquadFilter();
     hp.type = 'highpass';
     hp.frequency.value = 60 + lvl * 80;
-    const lp = ctx.createBiquadFilter();
+    const lp = c.createBiquadFilter();
     lp.type = 'lowpass';
     lp.frequency.value = 11000 - lvl * 4500;
-    const comp = ctx.createDynamicsCompressor();
+    const comp = c.createDynamicsCompressor();
     comp.threshold.value = -28;
     comp.ratio.value = 3;
     comp.knee.value = 12;
@@ -126,7 +126,7 @@ function buildChain(clip) {
     comp.connect(gain);
     input = hp;
   }
-  out.connect(master);
+  out.connect(dest);
   return { input, gain, out };
 }
 
@@ -139,31 +139,30 @@ function envelopeAt(clip, lt) {
   return g;
 }
 
-/**
- * Agenda todos os clipes audíveis a partir do tempo `from` da timeline.
- * Retorna o tempo de contexto que corresponde a `from` (âncora do relógio).
- */
-export function schedule(state, from) {
-  const c = ensureContext();
-  if (!c) return null;
-  stopAll();
-  const lead = 0.04;
-  const anchor = c.currentTime + lead;
+/** Clipes audíveis do estado, com o asset de cada um. */
+function audibleClips(state) {
   const assets = new Map(state.assets.map((a) => [a.id, a]));
   const tracks = new Map(state.tracks.map((t) => [t.id, t]));
+  const out = [];
   for (const clip of state.clips) {
     const track = tracks.get(clip.trackId);
-    if (!track || track.muted || clip.disabled) continue;
-    if (clip.audio?.muted) continue;
+    if (!track || track.muted || clip.disabled || clip.audio?.muted) continue;
     const asset = assets.get(clip.assetId);
     if (!asset) continue;
     const audible = asset.type === 'audio' || (asset.type === 'video' && asset.hasAudio);
-    if (!audible) continue;
-    const end = clip.start + clip.duration;
-    if (end <= from) continue;
+    if (audible) out.push({ clip, asset });
+  }
+  return out;
+}
+
+/** Agenda os clipes num contexto (ao vivo ou offline). `anchor` = tempo do contexto que corresponde a `from`. */
+function scheduleOn(c, dest, state, from, anchor, onMissing) {
+  const nodes = [];
+  for (const { clip, asset } of audibleClips(state)) {
+    if (clip.start + clip.duration <= from) continue;
     const buf = buffers.get(asset.id);
     if (buf === undefined) {
-      loadBuffer(asset);
+      onMissing?.(asset);
       continue;
     }
     if (!buf) continue;
@@ -182,14 +181,14 @@ export function schedule(state, from) {
     } else {
       src.playbackRate.value = clamp(clip.speed || 1, 0.0625, 16);
     }
-    const chain = buildChain(clip);
+    const chain = buildChain(c, dest, clip);
     const g = chain.gain.gain;
     g.setValueAtTime(envelopeAt(clip, lt0), when);
     const a = clip.audio || {};
     const fi = a.fadeIn || 0;
     const fo = a.fadeOut || 0;
     const v = a.volume ?? 1;
-    if (fi > 0 && lt0 < fi) g.linearRampToValueAtTime(v * clamp(1, 0, 1), when + (fi - lt0));
+    if (fi > 0 && lt0 < fi) g.linearRampToValueAtTime(v, when + (fi - lt0));
     if (fo > 0) {
       const foStart = clip.duration - fo;
       if (lt0 < foStart) g.setValueAtTime(v, when + (foStart - lt0));
@@ -198,9 +197,35 @@ export function schedule(state, from) {
     src.connect(chain.input);
     src.start(when, offset);
     src.stop(when + remaining);
-    active.push({ src, out: chain.out });
+    nodes.push({ src, out: chain.out });
   }
+  return nodes;
+}
+
+/**
+ * Agenda todos os clipes audíveis a partir do tempo `from` da timeline.
+ * Retorna o tempo de contexto que corresponde a `from` (âncora do relógio).
+ */
+export function schedule(state, from) {
+  const c = ensureContext();
+  if (!c) return null;
+  stopAll();
+  const anchor = c.currentTime + 0.04;
+  active = scheduleOn(c, master, state, from, anchor, (asset) => loadBuffer(asset));
   return anchor;
+}
+
+/** Mixa todo o áudio da timeline offline (mais rápido que tempo real) para a exportação. */
+export async function renderMixOffline(state, sampleRate = 48000, clipFilter = null) {
+  ensureContext();
+  if (clipFilter) state = { ...state, clips: state.clips.filter((c) => clipFilter(c, state.assets.find((a) => a.id === c.assetId))) };
+  const items = audibleClips(state);
+  await Promise.all(items.map(({ asset }) => loadBuffer(asset)));
+  const OAC = window.OfflineAudioContext || window.webkitOfflineAudioContext;
+  const length = Math.max(1, Math.ceil(state.duration * sampleRate));
+  const off = new OAC(clipFilter ? 1 : 2, length, sampleRate);
+  scheduleOn(off, off.destination, state, 0, 0);
+  return off.startRendering();
 }
 
 /** Pré-escuta de um asset de áudio da biblioteca (sem tocar na timeline). */

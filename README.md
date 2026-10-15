@@ -134,11 +134,11 @@ scripts/build-apk.sh          # Build do APK (aapt2 → javac → dx/d8 → zipa
 | Componente | Situação |
 | --- | --- |
 | Análise de áudio (BPM, batidas, ênfase, VAD), análise de quadros, chroma key, curvas de velocidade, mixagem e exportação | **Reais**, rodam no navegador. Na demo, o BPM detectado sai 86 para uma música de 85 BPM |
-| Speech-to-text | A narração demo traz os tempos das palavras (simula a saída de um Whisper). Em vídeos importados, cole o roteiro e ele é **alinhado aos trechos de voz detectados**. Para STT automático, registre um provedor com `setCustomSttProvider(fn)` em `src/ai/transcriber.js` (Whisper API, transformers.js etc.), devolvendo `{ words: [{ w, start, end }] }` |
+| Speech-to-text | **Real:** a fala de vídeos e áudios importados é transcrita no próprio aparelho pelo Whisper (transformers.js, num Web Worker). O padrão é o modelo `whisper-base` (~80 MB); há a opção `tiny` (~40 MB). O modelo é baixado do Hugging Face na primeira vez e depois fica em cache. A fala é dividida em trechos de voz (VAD) e há filtro contra repetições. O tempo de cada palavra é distribuído dentro do trecho. A narração demo usa uma transcrição pronta. |
 | Interpretação do prompt | Parser local em pt-BR. Para usar um LLM, troque `parsePrompt` por uma chamada que devolva o mesmo formato |
 | Smart Cutout em vídeos importados | Máscara de segmentação suave (aproximação). Nos assets demo, a máscara é exata. Para recorte de verdade, plugue MediaPipe Selfie Segmentation em `processBackground` (`src/engine/renderer.js`) |
 | Voz da narração demo | Síntese de fala do navegador durante a reprodução. Não entra no arquivo exportado |
-| Exportação | É feita em **tempo real**: mantenha a aba visível. H.264 depende do navegador; o Chromium sem codec proprietário grava VP9 dentro de MP4 ou WebM. Em 4K, a fluidez depende da máquina |
+| Exportação | **Quadro a quadro** com WebCodecs + mp4-muxer. O MP4 sai com taxa de quadros constante e índice correto, sem congelar no player. O codec é escolhido nesta ordem, conforme o que o aparelho oferece: H.264+AAC, depois VP9/AV1+Opus. Sem WebCodecs, o app grava em tempo real com MediaRecorder |
 
 ## 6. Atalhos
 

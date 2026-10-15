@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useEditorStore } from '../../store/useEditorStore';
 import { AIBadge } from '../ui/primitives';
+import { useTimeSubscription } from '../../hooks/useTimeSubscription';
 import TimelineToolbar from './TimelineToolbar';
 import TimeRuler from './TimeRuler';
 import AIMarkerLane from './AIMarkerLane';
@@ -9,9 +10,14 @@ import { RULER_H, AI_LANE_H } from './constants';
 import { useTimelineMetrics } from './metrics';
 
 function PlayheadLine({ headerW }) {
-  const t = useEditorStore((s) => s.currentTime);
-  const pps = useEditorStore((s) => s.pxPerSec);
-  return <div className="absolute top-0 bottom-0 w-px bg-white z-[25] pointer-events-none shadow-[0_0_6px_rgba(255,255,255,.6)]" style={{ left: headerW + t * pps }} />;
+  const ref = useRef(null);
+  useTimeSubscription(
+    (t, pps) => {
+      if (ref.current) ref.current.style.transform = `translateX(${headerW + t * pps}px)`;
+    },
+    [headerW],
+  );
+  return <div ref={ref} className="absolute left-0 top-0 bottom-0 w-px bg-white z-[25] pointer-events-none shadow-[0_0_6px_rgba(255,255,255,.6)] will-change-transform" />;
 }
 
 export default function Timeline({ height }) {
@@ -92,15 +98,15 @@ export default function Timeline({ height }) {
   return (
     <div className={`flex flex-col bg-ink-900 border-t border-ink-700 min-h-0 ${height ? 'shrink-0' : 'flex-1'}`} style={height ? { height } : undefined}>
       <TimelineToolbar onFit={fit} compact={compact} />
-      <div ref={scrollRef} className="relative flex-1 min-h-0 overflow-auto">
+      <div ref={scrollRef} className="relative flex-1 min-h-0 overflow-auto overscroll-contain">
         <div className="relative" style={{ width: HEADER_W + laneW, minHeight: '100%' }}>
-          <div className="sticky top-0 z-30 flex" style={{ height: RULER_H }}>
+          <div className="sticky top-0 z-30 flex [transform:translateZ(0)]" style={{ height: RULER_H }}>
             <div className="sticky left-0 z-40 shrink-0 bg-ink-900 border-r border-b border-ink-700 flex items-center px-2 text-[10px] text-ink-400 font-mono" style={{ width: HEADER_W }}>
               {compact ? 'Trilhas' : `${Math.round(pps)} px/s`}
             </div>
             <TimeRuler width={laneW} />
           </div>
-          <div className="sticky z-[29] flex" style={{ top: RULER_H, height: AI_LANE_H }}>
+          <div className="sticky z-[29] flex [transform:translateZ(0)]" style={{ top: RULER_H, height: AI_LANE_H }}>
             <div className="sticky left-0 z-40 shrink-0 bg-[#16122a] border-r border-b border-ai/20 flex items-center px-2" style={{ width: HEADER_W }}>
               {compact ? <span className="text-[9px] font-bold ai-text">✨ IA Motion</span> : <AIBadge small />}
             </div>

@@ -54,7 +54,7 @@ async function audioTracks(state) {
 const toTimeline = (clip, srcT) => clip.start + (srcT - clip.trimIn) / (clip.speed || 1);
 const inClip = (clip, t) => t >= clip.start && t <= clip.start + clip.duration;
 
-export async function analyzeContext(state, { scriptText = '', onStep, onProgress } = {}) {
+export async function analyzeContext(state, { scriptText = '', onStep, onProgress, onDetail, language, model } = {}) {
   const warnings = [];
   const step = async (id, fn) => {
     onStep?.(id, 'running');
@@ -73,8 +73,9 @@ export async function analyzeContext(state, { scriptText = '', onStep, onProgres
 
   const transcript = await step('stt', async () => {
     await wait(450);
-    const tr = await transcribe(state, audio, scriptText);
-    if (tr.source === 'none') warnings.push('Nenhuma fala transcrita: cole o roteiro no campo "Transcrição" ou configure um provedor STT (Whisper). Zooms e transições no beat continuam funcionando.');
+    const tr = await transcribe(state, audio, scriptText, { onDetail, language, model });
+    onDetail?.(null);
+    if (tr.source === 'none') warnings.push('Nenhuma fala detectada. Os motions foram gerados pelo ritmo e pelas cenas; você também pode colar o roteiro no campo "Transcrição".');
     return tr;
   });
   onProgress?.(0.32);

@@ -943,6 +943,175 @@ function check(ctx, m) {
   drawLabel(ctx, m, m.label, m.x, m.y + S * 0.72);
 }
 
+
+function musicNotes(ctx, m) {
+  const { t, dur, S, style, intensity } = m;
+  const rnd = seeded(m.seed);
+  const fade = outFade(t, dur);
+  const n = Math.round(7 * clamp(intensity, 0.4, 1.5) * Math.max(0.6, style.density));
+  const colors = [style.primary, style.secondary, style.accent];
+  for (let i = 0; i < n; i++) {
+    const delay = rnd() * 0.9;
+    const tt = t - delay;
+    if (tt < 0) continue;
+    const x = m.x + (rnd() - 0.5) * S * 2.4 + Math.sin(tt * 3 + i) * S * 0.2;
+    const y = m.y + S * 0.6 - tt * S * (0.7 + rnd() * 0.5);
+    const sz = S * (0.22 + rnd() * 0.16);
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.rotate(Math.sin(tt * 4 + i) * 0.25);
+    const k = pop(tt, 0.3);
+    ctx.scale(k, k);
+    ctx.globalAlpha *= fade * clamp(1.6 - tt / 1.4, 0, 1);
+    const c = colors[i % colors.length];
+    applyLook(ctx, style, c, S);
+    ctx.fillStyle = c;
+    ctx.strokeStyle = c;
+    ctx.lineWidth = sz * 0.12;
+    ctx.beginPath();
+    ctx.ellipse(0, 0, sz * 0.32, sz * 0.24, -0.4, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.moveTo(sz * 0.28, -sz * 0.05);
+    ctx.lineTo(sz * 0.28, -sz * 1.0);
+    ctx.quadraticCurveTo(sz * 0.6, -sz * 0.8, sz * 0.62, -sz * 0.45);
+    ctx.stroke();
+    ctx.restore();
+  }
+  drawLabel(ctx, m, m.label, m.x, m.y + S * 0.85);
+}
+
+function question(ctx, m) {
+  const { t, dur, S, style } = m;
+  const k = pop(t, 0.4);
+  const fade = outFade(t, dur);
+  ctx.save();
+  ctx.translate(m.x, m.y - Math.abs(Math.sin(t * 5)) * S * 0.06);
+  ctx.rotate(Math.sin(t * 3) * 0.12);
+  ctx.scale(k, k);
+  ctx.globalAlpha *= fade;
+  applyLook(ctx, style, style.secondary, S);
+  ctx.fillStyle = style.flat ? 'rgba(2,6,23,0.65)' : style.secondary;
+  ctx.beginPath();
+  ctx.arc(0, 0, S * 0.48, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.shadowColor = 'transparent';
+  if (style.flat) {
+    ctx.strokeStyle = style.secondary;
+    ctx.lineWidth = S * 0.04;
+    ctx.stroke();
+  }
+  ctx.fillStyle = style.flat ? style.secondary : '#ffffff';
+  ctx.font = `900 ${S * 0.7}px "${style.font}", Inter, sans-serif`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText('?', 0, S * 0.04);
+  ctx.restore();
+  drawLabel(ctx, m, m.label, m.x, m.y + S * 0.75);
+}
+
+function lightning(ctx, m) {
+  const { t, dur, S, style } = m;
+  const k = pop(t, 0.25);
+  const fade = outFade(t, dur);
+  const flash = t < 0.5 ? (Math.floor(t * 20) % 2 ? 1 : 0.4) : 1;
+  const col = style.flat ? style.primary : '#facc15';
+  ctx.save();
+  ctx.translate(m.x, m.y);
+  ctx.scale(k, k);
+  ctx.globalAlpha *= fade * flash;
+  const g = ctx.createRadialGradient(0, 0, 0, 0, 0, S * 1.1);
+  g.addColorStop(0, rgba(col, 0.45));
+  g.addColorStop(1, rgba(col, 0));
+  ctx.fillStyle = g;
+  ctx.fillRect(-S * 1.1, -S * 1.1, S * 2.2, S * 2.2);
+  ctx.shadowColor = col;
+  ctx.shadowBlur = S * 0.35;
+  ctx.fillStyle = col;
+  ctx.strokeStyle = style.flat ? style.accent : '#78350f';
+  ctx.lineWidth = S * 0.035;
+  ctx.lineJoin = 'round';
+  ctx.beginPath();
+  ctx.moveTo(S * 0.12, -S * 0.62);
+  ctx.lineTo(-S * 0.28, S * 0.06);
+  ctx.lineTo(-S * 0.02, S * 0.06);
+  ctx.lineTo(-S * 0.14, S * 0.62);
+  ctx.lineTo(S * 0.3, -S * 0.1);
+  ctx.lineTo(S * 0.03, -S * 0.1);
+  ctx.closePath();
+  ctx.fill();
+  ctx.shadowColor = 'transparent';
+  ctx.stroke();
+  ctx.restore();
+  drawLabel(ctx, m, m.label, m.x, m.y + S * 0.85);
+}
+
+function thumbsUp(ctx, m) {
+  const { t, dur, S, style } = m;
+  const k = pop(t, 0.4);
+  const fade = outFade(t, dur);
+  const bump = 1 + 0.08 * Math.max(0, Math.sin((t - 0.4) * 10)) * (t > 0.4 && t < 1 ? 1 : 0);
+  ctx.save();
+  ctx.translate(m.x, m.y);
+  ctx.scale(k * bump, k * bump);
+  ctx.rotate(-0.12 + Math.sin(t * 4) * 0.05);
+  ctx.globalAlpha *= fade;
+  applyLook(ctx, style, style.accent, S);
+  ctx.fillStyle = style.flat ? 'rgba(2,6,23,0.6)' : '#3b82f6';
+  ctx.beginPath();
+  ctx.arc(0, 0, S * 0.5, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.shadowColor = 'transparent';
+  ctx.fillStyle = style.flat ? style.primary : '#ffffff';
+  rr(ctx, -S * 0.26, -S * 0.02, S * 0.12, S * 0.3, S * 0.03);
+  ctx.fill();
+  ctx.beginPath();
+  ctx.moveTo(-S * 0.1, -S * 0.02);
+  ctx.lineTo(S * 0.0, -S * 0.3);
+  ctx.quadraticCurveTo(S * 0.06, -S * 0.36, S * 0.1, -S * 0.28);
+  ctx.lineTo(S * 0.06, -S * 0.06);
+  ctx.lineTo(S * 0.22, -S * 0.06);
+  ctx.quadraticCurveTo(S * 0.3, -S * 0.04, S * 0.26, S * 0.06);
+  ctx.lineTo(S * 0.2, S * 0.24);
+  ctx.quadraticCurveTo(S * 0.17, S * 0.29, S * 0.1, S * 0.28);
+  ctx.lineTo(-S * 0.1, S * 0.28);
+  ctx.closePath();
+  ctx.fill();
+  ctx.restore();
+  drawLabel(ctx, m, m.label, m.x, m.y + S * 0.78);
+}
+
+function stars(ctx, m) {
+  const { t, dur, S, style } = m;
+  const fade = outFade(t, dur);
+  ctx.save();
+  ctx.globalAlpha *= fade;
+  for (let i = 0; i < 5; i++) {
+    const k = pop(t - 0.1 - i * 0.1, 0.3);
+    if (k <= 0) continue;
+    ctx.save();
+    ctx.translate(m.x + (i - 2) * S * 0.42, m.y - Math.sin((i / 4) * Math.PI) * S * 0.12);
+    ctx.scale(k, k);
+    ctx.rotate(Math.sin(t * 3 + i) * 0.1);
+    applyLook(ctx, style, style.primary, S);
+    star5(ctx, S * 0.2);
+    if (style.flat) {
+      ctx.strokeStyle = style.primary;
+      ctx.lineWidth = S * 0.03;
+      ctx.stroke();
+    } else {
+      const g = ctx.createLinearGradient(0, -S * 0.2, 0, S * 0.2);
+      g.addColorStop(0, '#fef08a');
+      g.addColorStop(1, '#f59e0b');
+      ctx.fillStyle = g;
+      ctx.fill();
+    }
+    ctx.restore();
+  }
+  ctx.restore();
+  drawLabel(ctx, m, m.label, m.x, m.y + S * 0.5);
+}
+
 /* ------------------------------------------------------------------------------------------ */
 /* Tipografia cinética                                                                         */
 /* ------------------------------------------------------------------------------------------ */
@@ -1203,6 +1372,11 @@ export const MOTION_TEMPLATES = [
   { id: 'warning', name: 'Alerta', category: 'sticker', icon: 'TriangleAlert', draw: warning },
   { id: 'people', name: 'Público / Comunidade', category: 'sticker', icon: 'Users', draw: people },
   { id: 'check', name: 'Check Animado', category: 'sticker', icon: 'CircleCheck', draw: check },
+  { id: 'music', name: 'Notas Musicais', category: 'sticker', icon: 'Music', draw: musicNotes },
+  { id: 'question', name: 'Pergunta', category: 'sticker', icon: 'CircleHelp', draw: question },
+  { id: 'lightning', name: 'Raio de Energia', category: 'sticker', icon: 'Zap', draw: lightning },
+  { id: 'thumbs-up', name: 'Joinha / Like', category: 'sticker', icon: 'ThumbsUp', draw: thumbsUp },
+  { id: 'stars', name: 'Avaliação 5 Estrelas', category: 'sticker', icon: 'Star', draw: stars },
   // Tipografia
   { id: 'kinetic-pop', name: 'Kinetic Pop', category: 'typography', icon: 'Type', draw: (c, m) => typography(c, m, 'kinetic-pop') },
   { id: 'slide-stack', name: 'Slide Stack', category: 'typography', icon: 'Type', draw: (c, m) => typography(c, m, 'slide-stack') },

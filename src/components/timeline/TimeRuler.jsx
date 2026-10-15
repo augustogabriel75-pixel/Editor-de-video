@@ -1,4 +1,5 @@
-import { useMemo } from 'react';
+import { useMemo, useRef } from 'react';
+import { useTimeSubscription } from '../../hooks/useTimeSubscription';
 import { useEditorStore } from '../../store/useEditorStore';
 import { formatTime } from '../../lib/utils';
 import { RULER_H } from './constants';
@@ -6,10 +7,12 @@ import { RULER_H } from './constants';
 const STEPS = [0.5, 1, 2, 5, 10, 15, 30, 60];
 
 function PlayheadHead() {
-  const t = useEditorStore((s) => s.currentTime);
-  const pps = useEditorStore((s) => s.pxPerSec);
+  const ref = useRef(null);
+  useTimeSubscription((t, pps) => {
+    if (ref.current) ref.current.style.transform = `translateX(${t * pps - 6}px)`;
+  });
   return (
-    <div className="absolute top-0 pointer-events-none" style={{ left: t * pps - 6 }}>
+    <div ref={ref} className="absolute left-0 top-0 pointer-events-none will-change-transform">
       <svg width="12" height={RULER_H} viewBox={`0 0 12 ${RULER_H}`}>
         <path d={`M0 ${RULER_H - 12} h12 v4 l-6 8 l-6 -8z`} fill="#ffffff" />
         <line x1="6" x2="6" y1="0" y2={RULER_H} stroke="#ffffff" strokeWidth="1.5" />

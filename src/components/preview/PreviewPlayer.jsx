@@ -85,10 +85,10 @@ export default function PreviewPlayer({ compact = false }) {
     return () => ro.disconnect();
   }, [aspect.w, aspect.h, compact]);
 
-  const dpr = Math.min(2, window.devicePixelRatio || 1);
+  const dpr = Math.min(compact ? 1.75 : 2, window.devicePixelRatio || 1);
   let cw = Math.round(box.w * dpr);
   let ch = Math.round(box.h * dpr);
-  const k = Math.min(1, (compact ? 1280 : MAX_RENDER) / Math.max(cw, ch));
+  const k = Math.min(1, (compact ? 960 : MAX_RENDER) / Math.max(cw, ch));
   cw = Math.round(cw * k);
   ch = Math.round(ch * k);
 

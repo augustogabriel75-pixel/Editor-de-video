@@ -5,7 +5,10 @@ import { Section, Slider, IconButton, cx } from '../ui/primitives';
 
 export default function TransformSection({ clip, title = 'Transformação' }) {
   const hasKf = (clip.keyframes?.length || 0) > 0;
-  const now = useEditorStore((s) => s.currentTime);
+  // Sem keyframes só precisamos saber se o playhead está dentro do clipe (evita re-render a cada quadro).
+  const now = useEditorStore((s) =>
+    hasKf ? s.currentTime : s.currentTime >= clip.start && s.currentTime <= clip.start + clip.duration ? clip.start + 0.001 : clip.start - 1,
+  );
   const set = useEditorStore((s) => s.setTransformProp);
   const addKf = useEditorStore((s) => s.addKeyframe);
   const seek = useEditorStore((s) => s.seek);

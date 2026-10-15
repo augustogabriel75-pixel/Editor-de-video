@@ -44,7 +44,9 @@ const initialAI = {
   analysis: null,
   prompt: DEFAULT_PROMPT,
   scriptText: '',
-  options: { stickers: true, typography: true, camera: true, transitions: true, sfx: true, intensity: 70, styleId: 'auto' },
+  options: { stickers: true, typography: true, camera: true, transitions: true, sfx: true, intensity: 70, styleId: 'auto', sttLanguage: 'portuguese', sttModel: 'base' },
+  stepDetail: null,
+  transcribing: false,
   render: null, // { total, done, pending: [ids] }
   lastRun: null,
   error: null,
@@ -117,11 +119,17 @@ export const useEditorStore = create(
       });
     };
 
+    const setDetail = (stepDetail) => set((st) => ({ ai: { ...st.ai, stepDetail } }));
+
     const ensureTranscript = async () => {
       const s = get();
       if (s.ai.analysis?.transcript?.words?.length) return s.ai.analysis.transcript;
-      const tr = await transcribe(s, { tracks: [] }, s.ai.scriptText);
-      return tr;
+      set((st) => ({ ai: { ...st.ai, transcribing: true } }));
+      try {
+        return await transcribe(s, { tracks: [] }, s.ai.scriptText, { onDetail: setDetail, language: s.ai.options.sttLanguage, model: s.ai.options.sttModel });
+      } finally {
+        set((st) => ({ ai: { ...st.ai, transcribing: false, stepDetail: null } }));
+      }
     };
 
     const startAIRender = (ids) => {
@@ -513,7 +521,7 @@ export const useEditorStore = create(
       generateCaptions: async (presetId = 'tiktok', { maxWords = 4 } = {}) => {
         const transcript = await ensureTranscript();
         if (!transcript.words.length) {
-          toast('Nenhuma fala encontrada. Cole a transcrição na aba IA Motion.', 'warn');
+          toast('Nenhuma fala encontrada no áudio. Verifique se o vídeo tem som ou cole o roteiro na aba IA Motion.', 'warn');
           return 0;
         }
         const s = get();
@@ -573,6 +581,9 @@ export const useEditorStore = create(
           const st = get();
           const analysis = await analyzeContext(st, {
             scriptText: st.ai.scriptText,
+            language: st.ai.options.sttLanguage,
+            model: st.ai.options.sttModel,
+            onDetail: setDetail,
             onStep: setStep,
             onProgress: (progress) => set((s) => ({ ai: { ...s.ai, progress } })),
           });
@@ -611,7 +622,7 @@ export const useEditorStore = create(
           if (c) range = { start: c.start, end: c.start + c.duration };
         }
         const mainClips = s.clips.filter((c) => c.trackId === 'trk-main' && !c.disabled).sort((a, b) => a.start - b.start);
-        const specs = generateMotions(s.ai.analysis, { options: { ...s.ai.options, prompt: text }, spec, aspect: s.project.aspect, mainClips, range });
+        const specs = generateMotions(s.ai.analysis, { options: { ...s.ai.options, prompt: text }, spec, aspect: s.project.aspect, mainClips, range, title: s.project.title });
         const overlapsRange = (c) => !range || (c.start < range.end && c.start + c.duration > range.start);
         const kept = s.clips.filter((c) => !(c.ai && overlapsRange(c)));
         const created = [];

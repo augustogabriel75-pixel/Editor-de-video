@@ -26,7 +26,10 @@ function Steps() {
         {ai.steps.map((st) => (
           <li key={st.id} className={cx('flex items-center gap-2 text-[11.5px]', st.status === 'pending' ? 'text-ink-400' : st.status === 'running' ? 'text-white' : 'text-ink-200')}>
             {st.status === 'done' ? <CircleCheck size={14} className="text-emerald-400" /> : st.status === 'running' ? <LoaderCircle size={14} className="animate-spin text-ai-soft" /> : <Circle size={14} />}
-            {st.label}
+            <span className="min-w-0">
+              {st.label}
+              {st.status === 'running' && ai.stepDetail && <span className="block text-[10.5px] text-ai-soft">{ai.stepDetail}</span>}
+            </span>
           </li>
         ))}
       </ul>
@@ -36,7 +39,8 @@ function Steps() {
 
 function ContextSummary({ analysis }) {
   const seek = useEditorStore((s) => s.seek);
-  const t = useEditorStore((s) => s.currentTime);
+  // índice da palavra falada no playhead (muda por palavra, não por quadro)
+  const activeIdx = useEditorStore((s) => analysis.transcript.words.findIndex((w) => s.currentTime >= w.start && s.currentTime < w.end + 0.05));
   const chips = [
     { icon: Music2, label: analysis.bpm ? `${analysis.bpm} BPM` : 'Sem música', title: 'Andamento detectado na trilha musical' },
     { icon: MessageSquareText, label: `${analysis.transcript.words.length} palavras`, title: `Transcrição: ${analysis.transcript.provider}` },
@@ -68,7 +72,7 @@ function ContextSummary({ analysis }) {
         <div className="max-h-36 overflow-y-auto rounded-lg bg-ink-900 border border-ink-700 p-2.5 text-[12px] leading-relaxed">
           {analysis.transcript.words.map((w, i) => {
             const kw = kwByTime.get(w.start);
-            const active = t >= w.start && t < w.end + 0.05;
+            const active = i === activeIdx;
             return (
               <span key={i}>
                 <button
@@ -326,6 +330,22 @@ export default function AIMotionTab() {
           <Toggle ai checked={o.sfx} onChange={(v) => setOpt('sfx', v)} label="Efeitos sonoros sincronizados" description="Whoosh, caixa registradora, ding…" />
           <Slider ai label="Intensidade" value={o.intensity} min={20} max={130} suffix="%" onChange={(v) => setOpt('intensity', v)} />
           <label className="flex items-center justify-between gap-2">
+            <span className="text-[11px] text-ink-300">Idioma da fala</span>
+            <select value={o.sttLanguage} onChange={(e) => setOpt('sttLanguage', e.target.value)} className="bg-ink-850 border border-ink-600 rounded-md text-[12px] px-2 py-1.5 outline-none focus:border-ai">
+              <option value="portuguese">Português</option>
+              <option value="english">Inglês</option>
+              <option value="spanish">Espanhol</option>
+              <option value="auto">Detectar automaticamente</option>
+            </select>
+          </label>
+          <label className="flex items-center justify-between gap-2">
+            <span className="text-[11px] text-ink-300">Modelo de fala</span>
+            <select value={o.sttModel} onChange={(e) => setOpt('sttModel', e.target.value)} className="bg-ink-850 border border-ink-600 rounded-md text-[12px] px-2 py-1.5 outline-none focus:border-ai">
+              <option value="base">Preciso (~80 MB)</option>
+              <option value="tiny">Rápido (~40 MB)</option>
+            </select>
+          </label>
+          <label className="flex items-center justify-between gap-2">
             <span className="text-[11px] text-ink-300">Estilo padrão</span>
             <select value={o.styleId} onChange={(e) => setOpt('styleId', e.target.value)} className="bg-ink-850 border border-ink-600 rounded-md text-[12px] px-2 py-1.5 outline-none focus:border-ai">
               <option value="auto">Automático (pelo contexto)</option>
@@ -340,8 +360,7 @@ export default function AIMotionTab() {
 
         <Collapsible title="Transcrição / roteiro (opcional)" icon={FileText} defaultOpen={ai.analysis?.transcript?.source === 'none'}>
           <p className="text-[11px] text-ink-400 leading-relaxed">
-            Para vídeos importados: cole o roteiro e o MotionCut alinha as palavras aos trechos de voz detectados. Para STT automático real, conecte um provedor (Whisper) em{' '}
-            <code className="text-ink-200">src/ai/transcriber.js</code>.
+            A fala dos vídeos importados é transcrita automaticamente pelo Whisper no próprio aparelho (na 1ª vez o modelo de ~40 MB é baixado e fica salvo). Se preferir, cole o roteiro aqui e ele será alinhado à voz.
           </p>
           <textarea
             value={ai.scriptText}

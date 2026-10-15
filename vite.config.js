@@ -12,8 +12,9 @@ export default defineConfig(({ mode }) => {
     base: './',
     plugins: [react(), tailwindcss(), ...(single ? [viteSingleFile({ removeViteModuleLoader: true })] : [])],
     build: single
-      ? { outDir: 'dist-single', assetsInlineLimit: 100_000_000, cssCodeSplit: false, chunkSizeWarningLimit: 4000 }
+      ? { outDir: 'dist-single', assetsInlineLimit: (file) => !file.endsWith('.wasm'), cssCodeSplit: false, chunkSizeWarningLimit: 4000 }
       : { chunkSizeWarningLimit: 1200 },
+    worker: { format: 'es' },
     server: { port: 5173 },
   };
 });

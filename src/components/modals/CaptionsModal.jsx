@@ -34,6 +34,7 @@ export default function CaptionsModal() {
   const [preset, setPreset] = useState('tiktok');
   const [maxWords, setMaxWords] = useState(3);
   const [busy, setBusy] = useState(false);
+  const detail = useEditorStore((s) => s.ai.stepDetail);
   return (
     <Modal title="Legendas Automáticas" subtitle="Transcreve a fala e cria legendas dinâmicas com realce palavra por palavra." onClose={close} icon={Captions}>
       <div className="space-y-4">
@@ -47,6 +48,7 @@ export default function CaptionsModal() {
           ))}
         </div>
         <Slider label="Palavras por legenda" value={maxWords} min={1} max={7} onChange={setMaxWords} />
+        {busy && <div className="text-[12px] text-ai-soft flex items-center gap-2"><LoaderCircle size={14} className="animate-spin" />{detail || 'Transcrevendo o áudio…'}</div>}
         <div className="flex justify-end gap-2">
           <Button variant="ghost" onClick={close}>
             Cancelar

@@ -2,13 +2,13 @@
 import {
   Coins, Rocket, Heart, Lightbulb, TrendingUp, Clock, Trophy, Flame, Sparkles, Focus, MousePointer2, Globe,
   TriangleAlert, Users, CircleCheck, Type, ZoomIn, ZoomOut, Activity, Move, Zap, Film, Image, Music, Captions,
-  Layers, AudioLines, Wand2, Video,
+  Layers, AudioLines, Wand2, Video, CircleHelp, ThumbsUp, Star,
 } from 'lucide-react';
 
 export const ICONS = {
   Coins, Rocket, Heart, Lightbulb, TrendingUp, Clock, Trophy, Flame, Sparkles, Focus, MousePointer2, Globe,
   TriangleAlert, Users, CircleCheck, Type, ZoomIn, ZoomOut, Activity, Move, Zap, Film, Image, Music, Captions,
-  Layers, AudioLines, Wand2, Video,
+  Layers, AudioLines, Wand2, Video, CircleHelp, ThumbsUp, Star,
 };
 
 export const iconFor = (name) => ICONS[name] || Sparkles;

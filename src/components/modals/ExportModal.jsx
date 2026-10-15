@@ -33,7 +33,7 @@ export default function ExportModal() {
     setSaveState(null);
     nativeKeepScreenOn(true);
     try {
-      const result = await exportVideo({ aspect: project.aspect, short: r.short, fps, format, signal: abortRef.current.signal, onProgress: (progress) => setState((s) => ({ ...s, progress })) });
+      const result = await exportVideo({ aspect: project.aspect, short: r.short, fps, format, signal: abortRef.current.signal, onProgress: (progress, label) => setState((s) => ({ ...s, progress, label })) });
       if (!result) setState({ phase: 'idle', progress: 0, result: null, error: null });
       else setState({ phase: 'done', progress: 1, result, error: null });
     } catch (e) {
@@ -76,6 +76,7 @@ export default function ExportModal() {
             <div className="text-[15px] font-bold text-white">Exportação concluída!</div>
             <div className="text-[12px] text-ink-300 mt-1">
               {state.result.width}×{state.result.height} · {fps} fps · {fmtBytes(state.result.size)}
+              {state.result.codecs ? ` · ${state.result.codecs}` : ''}
             </div>
           </div>
           <video src={state.result.url} controls className="w-full max-h-64 rounded-lg bg-black" />
@@ -150,14 +151,14 @@ export default function ExportModal() {
             <Film size={18} className="text-brand shrink-0" />
             <div className="flex-1">
               Duração <span className="text-white font-mono">{formatTime(duration)}</span> · tamanho estimado <span className="text-white">~{fmtBytes(est)}</span>
-              <div className="text-[11px] text-ink-400 mt-0.5">A renderização acontece em tempo real; mantenha o app/aba aberto e visível. Em 4K o desempenho depende do aparelho.</div>
+              <div className="text-[11px] text-ink-400 mt-0.5">{formats.find((f) => f.id === fmt)?.engine === 'webcodecs' ? 'Renderização quadro a quadro: o arquivo sai fluido mesmo que o aparelho seja lento (só demora mais). Mantenha o app aberto.' : 'Gravação em tempo real: mantenha o app/aba aberto e visível.'}</div>
             </div>
           </div>
           {state.phase === 'running' && (
             <div className="space-y-1.5">
               <div className="flex justify-between text-[12px]">
                 <span className="text-white flex items-center gap-2">
-                  <LoaderCircle size={14} className="animate-spin text-brand" /> Renderizando {size.width}×{size.height}…
+                  <LoaderCircle size={14} className="animate-spin text-brand" /> {state.label || `Renderizando ${size.width}×${size.height}…`}
                 </span>
                 <span className="font-mono text-ink-200">{Math.round(state.progress * 100)}%</span>
               </div>

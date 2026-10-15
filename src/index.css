@@ -42,8 +42,25 @@
   }
 }
 
-html, body, #root {
+html, body {
   height: 100%;
+  overflow: hidden;
+  overscroll-behavior: none;
+}
+
+/* A página nunca rola: só os painéis internos. Mantém barras sempre visíveis no celular. */
+#root {
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+}
+
+@media (max-width: 940px) {
+  .backdrop-blur,
+  .backdrop-blur-sm {
+    -webkit-backdrop-filter: none !important;
+    backdrop-filter: none !important;
+  }
 }
 
 body {
