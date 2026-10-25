@@ -11,10 +11,12 @@ import { Muxer, ArrayBufferTarget } from 'mp4-muxer';
 import { useEditorStore } from '../store/useEditorStore';
 import { renderFrame } from './renderer';
 import { getExportStream, ensureContext, renderMixOffline } from './audioEngine';
-import { seekVideoExact } from './mediaPool';
+import { seekVideoExact, exportSeekStats } from './mediaPool';
 import { getAspect } from '../lib/catalog';
 import { sourceOffsetAt } from '../lib/speedCurves';
 import { isActiveAt } from '../lib/utils';
+import { encodeWav } from '../lib/audioExport';
+import { nativeCanMux, stageBlobNative, muxAacNative, nativeExportUrl } from '../lib/native';
 
 export const RESOLUTIONS = [
   { id: '720p', label: '720p HD', short: 720 },
@@ -63,13 +65,14 @@ function avcCandidates(w, h, fps) {
   return [`avc1.6400${level}`, `avc1.4d00${level}`, `avc1.4200${level}`, 'avc1.640033', 'avc1.640034'];
 }
 
-async function pickVideoCodec(w, h, fps, bitrate) {
+async function pickVideoCodec(w, h, fps, bitrate, avoid = new Set()) {
   const tries = [
     ...avcCandidates(w, h, fps).map((c) => ({ codec: c, mux: 'avc', extra: { avc: { format: 'avc' } } })),
     ...['vp09.00.10.08', 'vp09.00.40.08', 'vp09.00.51.08'].map((c) => ({ codec: c, mux: 'vp9' })),
     ...['av01.0.08M.08', 'av01.0.12M.08'].map((c) => ({ codec: c, mux: 'av1' })),
   ];
   for (const t of tries) {
+    if (avoid.has(t.codec)) continue;
     const config = { codec: t.codec, width: w, height: h, bitrate, framerate: fps, ...(t.extra || {}) };
     try {
       const r = await VideoEncoder.isConfigSupported(config);
@@ -101,14 +104,14 @@ async function pickAudioCodec(sampleRate, channels) {
 /* ------------------------------------------------------------------ preparação de quadros */
 
 /** Garante que os vídeos importados estejam exatamente no quadro do instante t. */
-async function prepareFrame(state, t) {
+async function prepareFrame(state, t, fps = 30) {
   const assets = new Map(state.assets.map((a) => [a.id, a]));
   const hidden = new Set(state.tracks.filter((x) => x.hidden).map((x) => x.id));
   const jobs = [];
   const want = (clip, at) => {
     const asset = assets.get(clip.assetId);
     if (!asset || asset.type !== 'video' || !asset.src) return;
-    jobs.push(seekVideoExact(asset, clip.trimIn + sourceOffsetAt(clip, Math.max(0, Math.min(clip.duration, at - clip.start)))));
+    jobs.push(seekVideoExact(asset, clip.trimIn + sourceOffsetAt(clip, Math.max(0, Math.min(clip.duration, at - clip.start))), { frameDur: 1 / fps }));
   };
   for (const clip of state.clips) {
     if (clip.disabled || hidden.has(clip.trackId) || !isActiveAt(clip, t)) continue;
@@ -123,19 +126,25 @@ async function prepareFrame(state, t) {
 }
 
 const nextTick = () => new Promise((r) => setTimeout(r, 0));
+if (typeof window !== 'undefined') window.__motioncutSeekStats = exportSeekStats;
 
 /* ------------------------------------------------------------------ WebCodecs */
 
-async function exportWebCodecs({ state, width, height, fps, onProgress, signal }) {
-  const bitrate = Math.round(width * height * fps * 0.1);
-  const video = await pickVideoCodec(width, height, fps, bitrate);
+async function exportWebCodecs({ state, width, height, fps, onProgress, signal, fileName, avoid }) {
+  // ~0,1 bit por pixel por quadro, com teto: arquivos gigantes travam no WhatsApp e em celulares mais simples
+  const bitrate = Math.min(Math.round(width * height * fps * 0.1), 40_000_000);
+  const video = await pickVideoCodec(width, height, fps, bitrate, avoid);
   if (!video) throw new Error('Nenhum codec de vídeo disponível (WebCodecs)');
+  avoid?.add(video.config.codec);
   const sampleRate = 48000;
   const audio = await pickAudioCodec(sampleRate, 2);
+  // Sem AAC no WebView (comum no Android): o app nativo codifica o áudio em AAC e monta o MP4.
+  // Opus dentro de MP4 não é aceito pelo WhatsApp.
+  const nativeAudio = nativeCanMux() && (video.mux === 'avc' || window.MOTIONCUT_TEST_NATIVE_MUX) && audio?.mux !== 'aac';
 
   onProgress?.(0.01, 'Mixando áudio…');
   let mix = null;
-  if (audio) {
+  if (audio || nativeAudio) {
     try {
       mix = await renderMixOffline(state, sampleRate);
     } catch (e) {
@@ -143,19 +152,28 @@ async function exportWebCodecs({ state, width, height, fps, onProgress, signal }
     }
   }
 
-  const target = new ArrayBufferTarget();
-  const muxer = new Muxer({
-    target,
-    video: { codec: video.mux, width, height, frameRate: fps },
-    ...(audio && mix ? { audio: { codec: audio.mux, numberOfChannels: 2, sampleRate } } : {}),
-    fastStart: 'in-memory',
-    firstTimestampBehavior: 'offset',
-  });
+  const makeMuxer = (withAudio) => {
+    const target = new ArrayBufferTarget();
+    const muxer = new Muxer({
+      target,
+      video: { codec: video.mux, width, height, frameRate: fps },
+      ...(withAudio ? { audio: { codec: audio.mux, numberOfChannels: 2, sampleRate } } : {}),
+      fastStart: 'in-memory',
+      firstTimestampBehavior: 'offset',
+    });
+    return { target, muxer, withAudio };
+  };
+  // principal: com o áudio do navegador (ou só vídeo, quando o app nativo vai pôr o AAC)
+  const main = makeMuxer(!!(audio && mix && !nativeAudio));
+  // reserva com Opus, caso a montagem nativa falhe
+  const backup = nativeAudio && audio && mix ? makeMuxer(true) : null;
+  const muxers = [main, backup].filter(Boolean);
 
   let encError = null;
-  // Áudio
-  if (audio && mix) {
-    const aenc = new AudioEncoder({ output: (chunk, meta) => muxer.addAudioChunk(chunk, meta), error: (e) => (encError = e) });
+  // Áudio do navegador
+  const audioTargets = muxers.filter((m) => m.withAudio);
+  if (audio && mix && audioTargets.length) {
+    const aenc = new AudioEncoder({ output: (chunk, meta) => audioTargets.forEach((m) => m.muxer.addAudioChunk(chunk, meta)), error: (e) => (encError = e) });
     aenc.configure(audio.config);
     const L = mix.getChannelData(0);
     const R = mix.numberOfChannels > 1 ? mix.getChannelData(1) : L;
@@ -180,10 +198,11 @@ async function exportWebCodecs({ state, width, height, fps, onProgress, signal }
   canvas.width = width;
   canvas.height = height;
   const ctx = canvas.getContext('2d');
-  const venc = new VideoEncoder({ output: (chunk, meta) => muxer.addVideoChunk(chunk, meta), error: (e) => (encError = e) });
+  const venc = new VideoEncoder({ output: (chunk, meta) => muxers.forEach((m) => m.muxer.addVideoChunk(chunk, meta)), error: (e) => (encError = e) });
   venc.configure({ ...video.config, latencyMode: 'quality' });
   const total = Math.max(1, Math.round(state.duration * fps));
   const frameDur = Math.round(1e6 / fps);
+  const span = nativeAudio ? 0.88 : 0.93;
   for (let i = 0; i < total; i++) {
     if (signal?.aborted) {
       venc.close();
@@ -191,25 +210,56 @@ async function exportWebCodecs({ state, width, height, fps, onProgress, signal }
     }
     if (encError) throw encError;
     const t = i / fps;
-    await prepareFrame(state, t);
+    await prepareFrame(state, t, fps);
     renderFrame(ctx, width, height, state, t, { export: true, playing: false });
     const frame = new VideoFrame(canvas, { timestamp: i * frameDur, duration: frameDur });
-    venc.encode(frame, { keyFrame: i % (fps * 2) === 0 });
+    venc.encode(frame, { keyFrame: i % fps === 0 });
     frame.close();
     while (venc.encodeQueueSize > 4) await nextTick();
     if (i % 3 === 0) {
-      onProgress?.(0.05 + 0.93 * (i / total), `Renderizando quadro ${i + 1}/${total}`);
+      onProgress?.(0.05 + span * (i / total), `Renderizando quadro ${i + 1}/${total}`);
       await nextTick();
     }
   }
   await venc.flush();
   venc.close();
   if (encError) throw encError;
-  onProgress?.(0.99, 'Finalizando arquivo…');
-  muxer.finalize();
-  const blob = new Blob([target.buffer], { type: 'video/mp4' });
-  const codecLabel = `${video.mux.toUpperCase()}${audio && mix ? ` + ${audio.mux.toUpperCase()}` : ''}`;
-  return { blob, url: URL.createObjectURL(blob), width, height, ext: 'mp4', size: blob.size, codecs: codecLabel };
+  onProgress?.(0.94, 'Finalizando arquivo…');
+  muxers.forEach((m) => m.muxer.finalize());
+  const vlabel = video.mux === 'avc' ? 'H.264' : video.mux.toUpperCase();
+  const finish = (blob, alabel, extra = {}) => ({
+    blob,
+    url: URL.createObjectURL(blob),
+    width,
+    height,
+    ext: 'mp4',
+    size: blob.size,
+    codecs: `${vlabel}${alabel ? ` + ${alabel}` : ''}`,
+    whatsapp: video.mux === 'avc' && (!alabel || alabel === 'AAC'),
+    ...extra,
+  });
+
+  if (nativeAudio && mix) {
+    onProgress?.(0.95, 'Montando MP4 com áudio AAC…');
+    try {
+      const stamp = Date.now();
+      const vName = await stageBlobNative(new Blob([main.target.buffer], { type: 'video/mp4' }), `mc-video-${stamp}.mp4`);
+      const L = mix.getChannelData(0);
+      const R = mix.numberOfChannels > 1 ? mix.getChannelData(1) : L;
+      const wName = await stageBlobNative(encodeWav([L, R], sampleRate), `mc-audio-${stamp}.wav`);
+      const r = await muxAacNative(vName, wName, fileName || `motioncut-${stamp}.mp4`);
+      if (!r.ok) throw new Error(r.error || 'falha ao montar MP4');
+      onProgress?.(0.99, 'Preparando pré-visualização…');
+      const blob = await (await fetch(nativeExportUrl(r.name))).blob();
+      return finish(new Blob([blob], { type: 'video/mp4' }), 'AAC', { nativeName: r.name });
+    } catch (e) {
+      console.warn('montagem nativa falhou', e);
+      if (backup) return finish(new Blob([backup.target.buffer], { type: 'video/mp4' }), audio.mux.toUpperCase(), { warning: `Não foi possível codificar o áudio em AAC (${e.message}).` });
+      throw e;
+    }
+  }
+  const hasAudio = !!(audio && mix);
+  return finish(new Blob([main.target.buffer], { type: 'video/mp4' }), hasAudio ? audio.mux.toUpperCase() : '');
 }
 
 /* ------------------------------------------------------------------ MediaRecorder (tempo real) */
@@ -263,16 +313,29 @@ async function exportRealtime({ width, height, fps, format, onProgress, signal }
 
 /* ------------------------------------------------------------------ API */
 
-export async function exportVideo({ aspect, short, fps = 30, format, onProgress, signal }) {
+export async function exportVideo({ aspect, short, fps = 30, format, onProgress, signal, fileName }) {
   const store = useEditorStore;
   const { width, height } = frameSize(aspect, short);
   store.getState().pause();
   store.getState().setExporting(true);
   try {
     if (format.engine === 'webcodecs') {
-      try {
-        return await exportWebCodecs({ state: store.getState(), width, height, fps, onProgress, signal });
-      } catch (e) {
+      // Alguns codificadores de hardware dizem aceitar um perfil e falham ao codificar:
+      // tenta os próximos perfis H.264 antes de cair na gravação em tempo real (WebM).
+      const avoid = new Set();
+      let lastErr;
+      for (let attempt = 0; attempt < 3; attempt++) {
+        try {
+          return await exportWebCodecs({ state: store.getState(), width, height, fps, onProgress, signal, fileName, avoid });
+        } catch (e) {
+          lastErr = e;
+          console.warn('WebCodecs falhou com', [...avoid].pop(), e);
+          if (signal?.aborted || /Nenhum codec/.test(String(e?.message))) break;
+          onProgress?.(0.01, 'Tentando outro codificador…');
+        }
+      }
+      {
+        const e = lastErr;
         console.warn('WebCodecs falhou, usando gravação em tempo real', e);
         const fallback = supportedFormats().find((f) => f.engine === 'mediarecorder');
         if (!fallback) throw e;

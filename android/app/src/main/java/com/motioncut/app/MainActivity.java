@@ -24,6 +24,7 @@ import android.webkit.WebViewClient;
 import android.widget.FrameLayout;
 
 import java.io.ByteArrayInputStream;
+import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
@@ -126,11 +127,27 @@ public class MainActivity extends Activity {
             Map<String, String> headers = new HashMap<String, String>();
             headers.put("Cache-Control", "no-cache");
             headers.put("Access-Control-Allow-Origin", "*");
+            if (path.startsWith("/__exports/")) return serveExport(path.substring("/__exports/".length()), headers);
             String mime = mimeFor(path);
             String encoding = mime.startsWith("text/") || mime.contains("json") || mime.contains("svg") ? "UTF-8" : null;
             try {
                 InputStream in = getAssets().open("www" + path);
                 WebResourceResponse res = new WebResourceResponse(mime, encoding, in);
+                res.setResponseHeaders(headers);
+                return res;
+            } catch (IOException e) {
+                return new WebResourceResponse("text/plain", "UTF-8", 404, "Not Found", headers, new ByteArrayInputStream(new byte[0]));
+            }
+        }
+
+        /** Entrega ao WebView um vídeo final montado pelo app (cache/exports), para a pré-visualização. */
+        private WebResourceResponse serveExport(String name, Map<String, String> headers) {
+            try {
+                File dir = new File(getCacheDir(), "exports");
+                File f = new File(dir, Uri.decode(name));
+                if (!f.getCanonicalPath().startsWith(dir.getCanonicalPath() + File.separator) || !f.exists()) throw new IOException("não encontrado");
+                headers.put("Content-Length", String.valueOf(f.length()));
+                WebResourceResponse res = new WebResourceResponse(f.getName().endsWith(".wav") ? "audio/wav" : "video/mp4", null, new java.io.FileInputStream(f));
                 res.setResponseHeaders(headers);
                 return res;
             } catch (IOException e) {

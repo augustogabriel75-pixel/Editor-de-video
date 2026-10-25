@@ -70,25 +70,61 @@ export function pauseAll() {
   for (const el of videos.values()) if (!el.paused) el.pause();
 }
 
-/** Posiciona o vídeo exatamente em `t` e espera o quadro (usado na exportação quadro a quadro). */
-export function seekVideoExact(asset, t) {
+// requestVideoFrameCallback: null = ainda não sabemos se dispara neste navegador, true = funciona, false = desligado
+let rvfcOk = null;
+let rvfcMisses = 0;
+export const exportSeekStats = { seeks: 0, rvfc: 0, timeouts: 0 };
+
+/**
+ * Posiciona o vídeo exatamente no quadro do instante `t` e espera esse quadro ficar pronto
+ * (exportação quadro a quadro).
+ *
+ * - Mira um pouco depois do início do quadro: os timestamps da fonte são arredondados
+ *   (WebM usa 1 ms, MP4 varia) e mirar exatamente em i/fps às vezes cai no quadro anterior,
+ *   o que gerava quadros repetidos/pulados (vídeo "com lag").
+ * - Depois do 'seeked' espera o quadro decodificado com requestVideoFrameCallback: no
+ *   Android/WebView o 'seeked' chega antes do quadro novo estar disponível para desenhar.
+ */
+export function seekVideoExact(asset, t, { frameDur = 1 / 30 } = {}) {
   const el = getVideo(asset);
   return new Promise((resolve) => {
     const go = () => {
       const dur = Number.isFinite(el.duration) ? el.duration : asset.duration || 0;
-      const target = clamp(t, 0, Math.max(0, dur - 0.04));
+      const target = clamp(t + Math.min(0.006, frameDur * 0.25), 0, Math.max(0, dur - 0.04));
       if (!el.paused) el.pause();
-      if (el.readyState >= 2 && !el.seeking && Math.abs(el.currentTime - target) < 0.004) return resolve();
+      if (el.readyState >= 2 && !el.seeking && Math.abs(el.currentTime - target) < 0.001) return resolve();
+      exportSeekStats.seeks++;
       let finished = false;
-      const done = () => {
+      const finish = () => {
         if (finished) return;
         finished = true;
-        el.removeEventListener('seeked', done);
+        el.removeEventListener('seeked', onSeeked);
         resolve();
       };
-      el.addEventListener('seeked', done);
+      const onSeeked = () => {
+        el.removeEventListener('seeked', onSeeked);
+        if (rvfcOk === false || typeof el.requestVideoFrameCallback !== 'function') return finish();
+        let got = false;
+        el.requestVideoFrameCallback(() => {
+          got = true;
+          rvfcOk = true;
+          rvfcMisses = 0;
+          exportSeekStats.rvfc++;
+          finish();
+        });
+        setTimeout(
+          () => {
+            if (got || finished) return;
+            exportSeekStats.timeouts++;
+            if (rvfcOk !== true && ++rvfcMisses >= 3) rvfcOk = false;
+            finish();
+          },
+          rvfcOk ? 150 : 160,
+        );
+      };
+      el.addEventListener('seeked', onSeeked);
       el.currentTime = target;
-      setTimeout(done, 2500);
+      setTimeout(finish, 4000);
     };
     if (el.readyState >= 1) go();
     else {

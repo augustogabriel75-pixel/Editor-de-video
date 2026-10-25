@@ -1,12 +1,20 @@
 import { useMemo, useRef, useState } from 'react';
-import { Download, Film, CircleCheck, LoaderCircle, TriangleAlert, Share2, Images } from 'lucide-react';
+import { Download, Film, CircleCheck, LoaderCircle, TriangleAlert, Share2, Images, MessageCircle } from 'lucide-react';
 import { useEditorStore } from '../../store/useEditorStore';
 import { exportVideo, RESOLUTIONS, frameSize, supportedFormats } from '../../engine/exporter';
 import { formatTime } from '../../lib/utils';
 import { Button, cx } from '../ui/primitives';
 import Modal from './Modal';
-import { isNativeApp, saveBlobNative, nativeKeepScreenOn } from '../../lib/native';
+import { isNativeApp, saveBlobNative, publishNative, nativeKeepScreenOn } from '../../lib/native';
 import { isTouchDevice } from '../../hooks/useIsMobile';
+
+const canWebShare = (file) => {
+  try {
+    return !!navigator.canShare?.({ files: [file] });
+  } catch {
+    return false;
+  }
+};
 
 const fmtBytes = (b) => (b > 1e6 ? `${(b / 1e6).toFixed(1)} MB` : `${Math.round(b / 1e3)} KB`);
 
@@ -33,7 +41,7 @@ export default function ExportModal() {
     setSaveState(null);
     nativeKeepScreenOn(true);
     try {
-      const result = await exportVideo({ aspect: project.aspect, short: r.short, fps, format, signal: abortRef.current.signal, onProgress: (progress, label) => setState((s) => ({ ...s, progress, label })) });
+      const result = await exportVideo({ aspect: project.aspect, short: r.short, fps, format, signal: abortRef.current.signal, fileName: `${baseName}.mp4`, onProgress: (progress, label) => setState((s) => ({ ...s, progress, label })) });
       if (!result) setState({ phase: 'idle', progress: 0, result: null, error: null });
       else setState({ phase: 'done', progress: 1, result, error: null });
     } catch (e) {
@@ -45,12 +53,13 @@ export default function ExportModal() {
     }
   };
 
-  const saveNative = async (share) => {
-    setSaveState({ busy: true, share });
+  const saveNative = async (share, target = '') => {
+    setSaveState({ busy: true, share, target });
     try {
-      const r = await saveBlobNative(state.result.blob, fileName, { gallery: !share, share });
+      const opts = { gallery: !share, share, target };
+      const r = state.result.nativeName ? publishNative(state.result.nativeName, opts) : await saveBlobNative(state.result.blob, fileName, opts);
       if (!r.ok) throw new Error(r.error || 'falha');
-      setSaveState({ done: true, share, location: r.location });
+      setSaveState({ done: true, share, target, location: r.location });
     } catch (e) {
       setSaveState({ error: String(e?.message || e) });
     }
@@ -61,7 +70,17 @@ export default function ExportModal() {
     close();
   };
 
-  const fileName = `${(project.title || 'motioncut').replace(/[^\w\- ]+/g, '').trim() || 'motioncut'}.${state.result?.ext || 'webm'}`;
+  const baseName = (project.title || 'motioncut').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^\w\- ]+/g, '').replace(/\s+/g, ' ').trim() || 'motioncut';
+  const fileName = `${baseName}.${state.result?.ext || 'webm'}`;
+
+  const webShare = async () => {
+    const file = new File([state.result.blob], fileName, { type: state.result.blob.type || 'video/mp4' });
+    try {
+      await navigator.share({ files: [file], title: project.title });
+    } catch (e) {
+      if (e?.name !== 'AbortError') setSaveState({ error: String(e?.message || e) });
+    }
+  };
 
   return (
     <Modal title="Exportar vídeo" subtitle="Grátis, sem marca d'água, renderizado 100% no seu navegador." onClose={onClose} icon={Download} width="max-w-2xl">
@@ -78,6 +97,17 @@ export default function ExportModal() {
               {state.result.width}×{state.result.height} · {fps} fps · {fmtBytes(state.result.size)}
               {state.result.codecs ? ` · ${state.result.codecs}` : ''}
             </div>
+            {state.result.whatsapp ? (
+              <div className="inline-flex items-center gap-1.5 mt-2 text-[11px] text-emerald-300 bg-emerald-500/10 border border-emerald-500/30 rounded-full px-2.5 py-0.5">
+                <CircleCheck size={12} /> MP4 compatível com WhatsApp, Instagram e TikTok
+              </div>
+            ) : (
+              <div className="mt-2 text-[11px] text-amber-200 bg-amber-500/10 border border-amber-500/30 rounded-lg px-3 py-1.5 text-left">
+                <TriangleAlert size={12} className="inline mr-1" />
+                {state.result.warning ? `${state.result.warning} ` : ''}
+                Este navegador não gera H.264 + AAC ({state.result.codecs}); o WhatsApp pode recusar o arquivo. Para enviar no WhatsApp use o app Android ou o Chrome/Edge no Windows ou Mac.
+              </div>
+            )}
           </div>
           <video src={state.result.url} controls className="w-full max-h-64 rounded-lg bg-black" />
           {isNativeApp ? (
@@ -86,7 +116,10 @@ export default function ExportModal() {
                 <Button variant="primary" icon={saveState?.busy && !saveState.share ? LoaderCircle : Images} disabled={saveState?.busy} onClick={() => saveNative(false)}>
                   Salvar na galeria
                 </Button>
-                <Button variant="secondary" icon={saveState?.busy && saveState.share ? LoaderCircle : Share2} disabled={saveState?.busy} onClick={() => saveNative(true)}>
+                <Button variant="secondary" icon={saveState?.busy && saveState.target === 'whatsapp' ? LoaderCircle : MessageCircle} disabled={saveState?.busy} onClick={() => saveNative(true, 'whatsapp')}>
+                  WhatsApp
+                </Button>
+                <Button variant="secondary" icon={saveState?.busy && saveState.share && !saveState.target ? LoaderCircle : Share2} disabled={saveState?.busy} onClick={() => saveNative(true)}>
                   Compartilhar
                 </Button>
               </div>
@@ -94,9 +127,19 @@ export default function ExportModal() {
               {saveState?.error && <div className="text-[12px] text-red-300">Erro: {saveState.error}</div>}
             </div>
           ) : (
-            <a href={state.result.url} download={fileName} className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-brand text-ink-950 font-bold text-[13px] hover:brightness-110">
-              <Download size={16} /> Baixar {fileName}
-            </a>
+            <div className="space-y-2">
+              <div className="flex flex-wrap justify-center gap-2">
+                <a href={state.result.url} download={fileName} className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-brand text-ink-950 font-bold text-[13px] hover:brightness-110">
+                  <Download size={16} /> Baixar {fileName}
+                </a>
+                {canWebShare(new File([state.result.blob], fileName, { type: 'video/mp4' })) && (
+                  <Button variant="secondary" icon={Share2} onClick={webShare}>
+                    Compartilhar (WhatsApp…)
+                  </Button>
+                )}
+              </div>
+              {saveState?.error && <div className="text-[12px] text-red-300">Erro: {saveState.error}</div>}
+            </div>
           )}
         </div>
       ) : (
@@ -154,6 +197,9 @@ export default function ExportModal() {
               <div className="text-[11px] text-ink-400 mt-0.5">{formats.find((f) => f.id === fmt)?.engine === 'webcodecs' ? 'Renderização quadro a quadro: o arquivo sai fluido mesmo que o aparelho seja lento (só demora mais). Mantenha o app aberto.' : 'Gravação em tempo real: mantenha o app/aba aberto e visível.'}</div>
             </div>
           </div>
+          {(r.short > 1080 || fps > 30) && (
+            <div className="text-[11px] text-ink-300 -mt-2">💬 Vai mandar no WhatsApp? Use <button type="button" className="text-brand underline" onClick={() => { setRes('1080p'); setFps(30); }}>1080p · 30 fps</button>: o arquivo fica menor e envia mais rápido (o WhatsApp recomprime vídeos maiores).</div>
+          )}
           {state.phase === 'running' && (
             <div className="space-y-1.5">
               <div className="flex justify-between text-[12px]">

@@ -95,6 +95,7 @@ A interface tem:
 - **Biblioteca de efeitos**: glitch, separação RGB, VHS, pixelizar, zoom pulsante, tremor, zoom radial, flash, estroboscópio, desfoque, glow, granulado, filme antigo, vinheta, vazamento de luz, bokeh e espelho.
 - **13 transições**, **16 filtros** com intensidade, **animações** de entrada, saída e loop, **keyframes** (posição, escala, rotação e opacidade), modos de mistura no PIP, estilos de texto e modelos animados.
 - **Extrair áudio do vídeo**: selecione um clipe de vídeo e use **Extrair áudio** na barra da timeline (ou Inspetor → Áudio → *Extrair áudio para a timeline*). O som vai para uma trilha de áudio própria (Narração, Música ou SFX, a que estiver livre), alinhado e com o mesmo corte e velocidade, e o vídeo fica mudo. **Salvar áudio (.wav)** grava o áudio de qualquer clipe como arquivo WAV (no Android vai para *Downloads/MotionCut*).
+- **Exportação pronta para WhatsApp**: o MP4 sai em H.264 + AAC, o formato da câmera do celular, aceito por WhatsApp, Instagram e TikTok. No app Android, quando o WebView não tem codificador AAC, o próprio aparelho codifica o áudio (MediaCodec) e monta o MP4 (MediaMuxer). Depois de exportar, o botão **WhatsApp** abre o envio direto. A janela avisa quando o navegador não consegue gerar um arquivo compatível (por exemplo, Chromium no Linux ou Firefox).
 - **Exportação real** em 720p, 1080p, 2K ou **4K**, a 24, 30 ou 60 fps, em MP4 ou WebM, com o áudio mixado e sem marca d'água.
 
 ## 4. Arquitetura

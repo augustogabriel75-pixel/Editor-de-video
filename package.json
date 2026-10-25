@@ -1,7 +1,7 @@
 {
   "name": "motioncut",
   "private": true,
-  "version": "1.3.0",
+  "version": "1.4.0",
   "description": "MotionCut — editor de vídeo web gratuito inspirado no CapCut, com motor de IA Motion contextual.",
   "type": "module",
   "scripts": {

@@ -1,9 +1,11 @@
 package com.motioncut.app;
 
 import android.app.Activity;
+import android.content.ClipData;
 import android.content.ContentResolver;
 import android.content.ContentValues;
 import android.content.Intent;
+import android.content.pm.PackageManager;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
@@ -41,6 +43,9 @@ public class NativeBridge implements TextToSpeech.OnInitListener {
     private TextToSpeech tts;
     private volatile boolean ttsReady = false;
     private final Map<String, Pending> files = new HashMap<String, Pending>();
+    /** Arquivos já gravados no cache (por nome) e onde cada um foi salvo na galeria. */
+    private final Map<String, String> stagedMime = new HashMap<String, String>();
+    private final Map<String, Uri> savedUris = new HashMap<String, Uri>();
 
     private static class Pending {
         File file;
@@ -129,8 +134,7 @@ public class NativeBridge implements TextToSpeech.OnInitListener {
             if (!dir.exists() && !dir.mkdirs()) return "";
             File[] old = dir.listFiles();
             if (old != null) for (File f : old) if (System.currentTimeMillis() - f.lastModified() > 3600_000L) f.delete();
-            String safe = name.replaceAll("[^A-Za-z0-9._ -]", "_").trim();
-            if (safe.isEmpty()) safe = "motioncut.mp4";
+            String safe = safeName(name, "motioncut.mp4");
             Pending p = new Pending();
             p.file = new File(dir, safe);
             p.name = safe;
@@ -163,49 +167,167 @@ public class NativeBridge implements TextToSpeech.OnInitListener {
         }
     }
 
+    private File exportsDir() {
+        return new File(activity.getCacheDir(), "exports");
+    }
+
+    private File stagedFile(String name) throws IOException {
+        File dir = exportsDir();
+        File f = new File(dir, name);
+        if (!f.getCanonicalPath().startsWith(dir.getCanonicalPath() + File.separator)) throw new IOException("caminho inválido");
+        if (!f.exists()) throw new IOException("arquivo não encontrado: " + name);
+        return f;
+    }
+
+    private static String safeName(String name, String fallback) {
+        String safe = name == null ? "" : name.replaceAll("[^A-Za-z0-9._ -]", "_").trim();
+        return safe.isEmpty() ? fallback : safe;
+    }
+
     /** Fecha o arquivo e opcionalmente salva na galeria (Filmes/MotionCut) e/ou abre o compartilhamento. */
     @JavascriptInterface
     public String finishFile(String id, boolean saveToGallery, boolean share) {
+        String name = closeFile(id);
+        if (name.isEmpty()) return error("arquivo desconhecido");
+        return publish(name, saveToGallery, share, "");
+    }
+
+    /** Fecha o arquivo enviado em pedaços e o mantém no cache. Devolve o nome (ou "" em caso de erro). */
+    @JavascriptInterface
+    public String closeFile(String id) {
         Pending p;
         synchronized (files) {
             p = files.remove(id);
         }
+        if (p == null) return "";
+        try {
+            p.out.close();
+            synchronized (stagedMime) {
+                stagedMime.put(p.name, p.mime);
+                savedUris.remove(p.name);
+            }
+            return p.name;
+        } catch (IOException e) {
+            Log.e(MainActivity.TAG, "closeFile", e);
+            return "";
+        }
+    }
+
+    /**
+     * Junta a trilha de vídeo de `videoName` com o áudio WAV `wavName` (codificado em AAC pelo
+     * aparelho) num MP4 padrão. Roda em segundo plano e responde em window.__motioncutNativeCb(cb, json).
+     */
+    @JavascriptInterface
+    public void muxAacAsync(final String videoName, final String wavName, final String outName, final String cb) {
+        new Thread(new Runnable() {
+            @Override
+            public void run() {
+                String result;
+                try {
+                    File video = stagedFile(videoName);
+                    File wav = wavName == null || wavName.isEmpty() ? null : stagedFile(wavName);
+                    String name = safeName(outName, "motioncut.mp4");
+                    File out = new File(exportsDir(), name);
+                    if (out.getCanonicalPath().equals(video.getCanonicalPath())) {
+                        name = "final-" + name;
+                        out = new File(exportsDir(), name);
+                    }
+                    ExportMuxer.mux(video, wav, out);
+                    synchronized (stagedMime) {
+                        stagedMime.put(name, "video/mp4");
+                        savedUris.remove(name);
+                    }
+                    video.delete();
+                    if (wav != null) wav.delete();
+                    JSONObject o = new JSONObject();
+                    o.put("ok", true);
+                    o.put("name", name);
+                    o.put("size", out.length());
+                    result = o.toString();
+                } catch (Throwable e) {
+                    Log.e(MainActivity.TAG, "muxAac", e);
+                    result = error(e.getClass().getSimpleName() + ": " + e.getMessage());
+                }
+                final String js = "window.__motioncutNativeCb&&window.__motioncutNativeCb(" + JSONObject.quote(cb) + "," + JSONObject.quote(result) + ")";
+                activity.runOnUiThread(new Runnable() {
+                    @Override
+                    public void run() {
+                        webView.evaluateJavascript(js, null);
+                    }
+                });
+            }
+        }).start();
+    }
+
+    /**
+     * Salva na galeria e/ou compartilha um arquivo do cache.
+     * target: "" (escolher app) ou "whatsapp" (abre direto no WhatsApp, se instalado).
+     */
+    @JavascriptInterface
+    public String publish(String name, boolean saveToGallery, boolean share, String target) {
         JSONObject res = new JSONObject();
         try {
-            if (p == null) {
-                res.put("ok", false);
-                res.put("error", "arquivo desconhecido");
-                return res.toString();
+            File f = stagedFile(name);
+            String mime;
+            synchronized (stagedMime) {
+                mime = stagedMime.get(name);
             }
-            p.out.close();
+            if (mime == null) mime = name.toLowerCase(Locale.ROOT).endsWith(".mp4") ? "video/mp4" : "application/octet-stream";
             res.put("ok", true);
-            res.put("size", p.file.length());
-            if (saveToGallery) {
-                String where = saveCopy(p);
-                res.put("saved", where != null);
-                if (where != null) res.put("location", where);
+            res.put("size", f.length());
+            Uri saved = null;
+            // Compartilhar pela galeria (MediaStore) é o caminho mais compatível com WhatsApp e afins.
+            if (saveToGallery || (share && mime.startsWith("video/"))) {
+                try {
+                    saved = saveCopy(f, name, mime);
+                    if (saveToGallery) {
+                        res.put("saved", saved != null);
+                        String where = lastSavedLocation;
+                        if (where != null) res.put("location", where);
+                    }
+                } catch (Exception e) {
+                    Log.w(MainActivity.TAG, "saveCopy", e);
+                    if (saveToGallery) throw e;
+                }
             }
-            if (share) openShare(p);
+            if (share) {
+                Uri uri = saved != null && Build.VERSION.SDK_INT >= 29 ? saved : ShareProvider.uriFor(f);
+                String r = openShare(uri, mime, name, target);
+                res.put("shared", r);
+            }
         } catch (Exception e) {
-            Log.e(MainActivity.TAG, "finishFile", e);
-            try {
-                res.put("ok", false);
-                res.put("error", String.valueOf(e.getMessage()));
-            } catch (JSONException ignored) {
-                // nunca acontece
-            }
+            Log.e(MainActivity.TAG, "publish", e);
+            return error(String.valueOf(e.getMessage()));
         }
         return res.toString();
     }
 
-    private String saveCopy(Pending p) throws IOException {
-        boolean video = p.mime.startsWith("video/");
+    private static String error(String msg) {
+        JSONObject o = new JSONObject();
+        try {
+            o.put("ok", false);
+            o.put("error", msg);
+        } catch (JSONException ignored) {
+            // nunca acontece
+        }
+        return o.toString();
+    }
+
+    private String lastSavedLocation;
+
+    private Uri saveCopy(File file, String name, String mime) throws IOException {
+        synchronized (stagedMime) {
+            Uri prev = savedUris.get(name);
+            if (prev != null) return prev;
+        }
+        boolean video = mime.startsWith("video/");
+        String folder = (video ? Environment.DIRECTORY_MOVIES : Environment.DIRECTORY_DOWNLOADS) + "/MotionCut";
+        Uri result;
         if (Build.VERSION.SDK_INT >= 29) {
             ContentResolver resolver = activity.getContentResolver();
             ContentValues v = new ContentValues();
-            v.put(MediaStore.MediaColumns.DISPLAY_NAME, p.name);
-            v.put(MediaStore.MediaColumns.MIME_TYPE, p.mime);
-            String folder = (video ? Environment.DIRECTORY_MOVIES : Environment.DIRECTORY_DOWNLOADS) + "/MotionCut";
+            v.put(MediaStore.MediaColumns.DISPLAY_NAME, name);
+            v.put(MediaStore.MediaColumns.MIME_TYPE, mime);
             v.put(MediaStore.MediaColumns.RELATIVE_PATH, folder);
             v.put(MediaStore.MediaColumns.IS_PENDING, 1);
             Uri collection = video
@@ -215,34 +337,65 @@ public class NativeBridge implements TextToSpeech.OnInitListener {
             if (item == null) return null;
             OutputStream os = resolver.openOutputStream(item);
             if (os == null) return null;
-            copy(new FileInputStream(p.file), os);
+            copy(new FileInputStream(file), os);
             ContentValues done = new ContentValues();
             done.put(MediaStore.MediaColumns.IS_PENDING, 0);
             resolver.update(item, done, null, null);
-            return folder + "/" + p.name;
+            lastSavedLocation = folder + "/" + name;
+            result = item;
+        } else {
+            File dir = activity.getExternalFilesDir(video ? Environment.DIRECTORY_MOVIES : Environment.DIRECTORY_DOWNLOADS);
+            if (dir == null) return null;
+            File out = new File(dir, name);
+            copy(new FileInputStream(file), new FileOutputStream(out));
+            lastSavedLocation = out.getAbsolutePath();
+            result = Uri.fromFile(out);
         }
-        File dir = activity.getExternalFilesDir(video ? Environment.DIRECTORY_MOVIES : Environment.DIRECTORY_DOWNLOADS);
-        if (dir == null) return null;
-        File out = new File(dir, p.name);
-        copy(new FileInputStream(p.file), new FileOutputStream(out));
-        return out.getAbsolutePath();
+        synchronized (stagedMime) {
+            savedUris.put(name, result);
+        }
+        return result;
     }
 
-    private void openShare(final Pending p) {
-        final Uri uri = ShareProvider.uriFor(p.file);
+    private String openShare(final Uri uri, final String mime, final String name, final String target) {
+        final Intent send = new Intent(Intent.ACTION_SEND);
+        send.setType(mime);
+        send.putExtra(Intent.EXTRA_STREAM, uri);
+        send.setClipData(ClipData.newRawUri(name, uri));
+        send.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+        String pkg = null;
+        if ("whatsapp".equals(target)) {
+            PackageManager pm = activity.getPackageManager();
+            for (String cand : new String[] { "com.whatsapp", "com.whatsapp.w4b" }) {
+                try {
+                    pm.getPackageInfo(cand, 0);
+                    pkg = cand;
+                    break;
+                } catch (PackageManager.NameNotFoundException ignored) {
+                    // não instalado
+                }
+            }
+        }
+        final String chosen = pkg;
         activity.runOnUiThread(new Runnable() {
             @Override
             public void run() {
-                Intent send = new Intent(Intent.ACTION_SEND);
-                send.setType(p.mime);
-                send.putExtra(Intent.EXTRA_STREAM, uri);
-                send.putExtra(Intent.EXTRA_TITLE, p.name);
-                send.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+                try {
+                    if (chosen != null) {
+                        send.setPackage(chosen);
+                        activity.startActivity(send);
+                        return;
+                    }
+                } catch (Exception e) {
+                    Log.w(MainActivity.TAG, "whatsapp", e);
+                    send.setPackage(null);
+                }
                 Intent chooser = Intent.createChooser(send, "Compartilhar vídeo");
                 chooser.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
                 activity.startActivity(chooser);
             }
         });
+        return chosen != null ? chosen : "chooser";
     }
 
     private static void copy(InputStream in, OutputStream out) throws IOException {
