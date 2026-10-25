@@ -95,7 +95,8 @@ A interface tem:
 - **Biblioteca de efeitos**: glitch, separação RGB, VHS, pixelizar, zoom pulsante, tremor, zoom radial, flash, estroboscópio, desfoque, glow, granulado, filme antigo, vinheta, vazamento de luz, bokeh e espelho.
 - **13 transições**, **16 filtros** com intensidade, **animações** de entrada, saída e loop, **keyframes** (posição, escala, rotação e opacidade), modos de mistura no PIP, estilos de texto e modelos animados.
 - **Extrair áudio do vídeo**: selecione um clipe de vídeo e use **Extrair áudio** na barra da timeline (ou Inspetor → Áudio → *Extrair áudio para a timeline*). O som vai para uma trilha de áudio própria (Narração, Música ou SFX, a que estiver livre), alinhado e com o mesmo corte e velocidade, e o vídeo fica mudo. **Salvar áudio (.wav)** grava o áudio de qualquer clipe como arquivo WAV (no Android vai para *Downloads/MotionCut*).
-- **Exportação pronta para WhatsApp**: o MP4 sai em H.264 + AAC, o formato da câmera do celular, aceito por WhatsApp, Instagram e TikTok. No app Android, quando o WebView não tem codificador AAC, o próprio aparelho codifica o áudio (MediaCodec) e monta o MP4 (MediaMuxer). Depois de exportar, o botão **WhatsApp** abre o envio direto. A janela avisa quando o navegador não consegue gerar um arquivo compatível (por exemplo, Chromium no Linux ou Firefox).
+- **Exportação pronta para WhatsApp**: o MP4 sai em H.264 + AAC, o formato da câmera do celular, aceito por WhatsApp, Instagram e TikTok. Quando o navegador não codifica AAC (Firefox, Chromium no Linux, muitos WebViews Android), o app usa um codificador AAC embutido (Fraunhofer FDK em WebAssembly, pacote `@audio/encode-aac`). No Android ainda existe a reserva nativa (MediaCodec + MediaMuxer). Depois de exportar, o botão **WhatsApp** abre o envio direto.
+- **Quadros exatos na exportação**: os vídeos importados são decodificados direto do arquivo (WebCodecs `VideoDecoder` via [Mediabunny](https://mediabunny.dev)), quadro a quadro e em ordem. Não há quadros repetidos ou pulados em nenhum navegador, e a exportação fica bem mais rápida. Se o codec não for suportado, o app volta para o posicionamento do `<video>`.
 - **Exportação real** em 720p, 1080p, 2K ou **4K**, a 24, 30 ou 60 fps, em MP4 ou WebM, com o áudio mixado e sem marca d'água.
 
 ## 4. Arquitetura
@@ -151,3 +152,7 @@ scripts/build-apk.sh          # Build do APK (aapt2 → javac → dx/d8 → zipa
 ## 6. Atalhos
 
 `Espaço` reproduzir/pausar · `←/→` um quadro (com `Shift`, 1 s) · `S` ou `Ctrl+B` dividir · `Del` excluir · `Ctrl+D` duplicar · `K` keyframe · `Ctrl+Z` / `Ctrl+Shift+Z` desfazer/refazer · `+`/`−` zoom · `G` gerar Motion IA · `Esc` limpar seleção · `Ctrl+S` salvar projeto.
+
+## Licenças de terceiros
+
+O codificador AAC embutido é a Fraunhofer FDK AAC Codec Library (via `@audio/encode-aac`), distribuída sob a licença própria dela (`node_modules/@audio/encode-aac/LICENSE.fdk-aac`). Essa licença não concede licença de patentes: o AAC é coberto por patentes, e uma distribuição comercial pode precisar de licença do pool de patentes (Via LA). O Mediabunny usa a licença MPL-2.0.

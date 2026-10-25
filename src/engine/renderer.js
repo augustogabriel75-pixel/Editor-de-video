@@ -155,6 +155,8 @@ function getSource(asset, clip, srcTime, opts, slot) {
     return { img: c, w: c.width, h: c.height, nativeCutout: variant === 'cutout' };
   }
   if (asset.type === 'video') {
+    const decoded = opts.frames?.get(clip.id);
+    if (decoded) return { img: decoded, w: decoded.width, h: decoded.height };
     const lt = srcTime - clip.trimIn;
     const el = videoFrame(asset, srcTime, { playing: opts.playing, rate: instantSpeedAt(clip, lt) });
     if (!el || !el.videoWidth) return null;
