@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Gera o instalador do MotionCut para Windows (x64) a partir do Linux:
 #   Electron (Windows) + editor (dist/) + FFmpeg (BtbN, GPL) -> desktop/build/MotionCut-Setup-<versão>.exe
-# Requisitos: node/npm, curl, unzip, python3 com Pillow, makensis (apt install nsis).
+# Requisitos: node/npm, curl, unzip, makensis (apt install nsis).
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -52,11 +52,7 @@ rm -rf "$APP/www/models" # modelos de teste locais, se houver
 
 ICON_SRC="$ROOT/android/app/src/main/res/mipmap-xxxhdpi/ic_launcher.png"
 cp "$ICON_SRC" "$APP/icon.png"
-python3 -c "
-from PIL import Image
-im = Image.open('$ICON_SRC').convert('RGBA').resize((256, 256), Image.LANCZOS)
-im.save('$APP/icon.ico', sizes=[(16,16),(24,24),(32,32),(48,48),(64,64),(128,128),(256,256)])
-"
+cp "$ROOT/desktop/icon.ico" "$APP/icon.ico" # gerado do ícone do Android (16–256 px)
 
 mkdir -p "$APPDIR/resources/ffmpeg"
 TMPF="$(mktemp -d)"
