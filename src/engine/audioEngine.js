@@ -1,3 +1,4 @@
+import { decodeAudioFallback } from '../lib/mediaProbe';
 /**
  * Motor de áudio baseado em WebAudio.
  * - Agenda cada clipe de áudio (e o áudio dos vídeos importados) com volume, fade in/out,
@@ -71,8 +72,12 @@ export async function loadBuffer(asset) {
         buf = c.createBuffer(1, samples.length, SYNTH_RATE);
         buf.copyToChannel(samples, 0);
       } else if (asset.src && (asset.type === 'audio' || asset.type === 'video')) {
-        const ab = await (await fetch(asset.src)).arrayBuffer();
-        buf = await c.decodeAudioData(ab);
+        const blob = await (await fetch(asset.src)).blob();
+        try {
+          buf = await c.decodeAudioData(await blob.arrayBuffer());
+        } catch {
+          buf = await decodeAudioFallback(blob, c).catch(() => null);
+        }
       }
       buffers.set(asset.id, buf);
       listeners.forEach((fn) => fn(asset.id));

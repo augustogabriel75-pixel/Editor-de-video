@@ -1,3 +1,4 @@
+import { decodeAudioFallback } from '../lib/mediaProbe';
 /**
  * Análise de áudio real (sem rede): envelope de energia, detecção de onsets/batidas,
  * estimativa de BPM, picos de ênfase e detecção de atividade de voz (VAD).
@@ -12,10 +13,17 @@ export async function decodeToMono(asset) {
   if (asset.synth) return { samples: getSynthSamples(asset.synth.kind, asset.synth.id), sampleRate: SYNTH_RATE };
   if (!asset.src) return null;
   try {
-    const ab = await (await fetch(asset.src)).arrayBuffer();
+    const blob = await (await fetch(asset.src)).blob();
     const OAC = window.OfflineAudioContext || window.webkitOfflineAudioContext;
     const ctx = new OAC(1, 22050, 22050);
-    const buf = await ctx.decodeAudioData(ab);
+    let buf = null;
+    try {
+      buf = await ctx.decodeAudioData(await blob.arrayBuffer());
+    } catch {
+      // ex.: .mov do iPhone em navegadores cujo decodeAudioData não lê QuickTime
+      buf = await decodeAudioFallback(blob).catch(() => null);
+    }
+    if (!buf) return null;
     const ch0 = buf.getChannelData(0);
     if (buf.numberOfChannels > 1) {
       const ch1 = buf.getChannelData(1);

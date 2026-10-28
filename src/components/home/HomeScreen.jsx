@@ -4,6 +4,7 @@ import { useEditorStore } from '../../store/useEditorStore';
 import { ASPECT_RATIOS } from '../../lib/catalog';
 import { formatTime } from '../../lib/utils';
 import { importFiles } from '../../lib/importer';
+import { IMPORT_ACCEPT } from '../../lib/mediaTypes';
 import { cx } from '../ui/primitives';
 
 const ICON = { '16:9': RectangleHorizontal, '9:16': Smartphone, '1:1': Square, '4:5': RectangleVertical };
@@ -31,6 +32,7 @@ function NewProjectPanel({ onClose }) {
       const st = useEditorStore.getState();
       const imported = await importFiles([...files]);
       st.addAssets(imported);
+      for (const err of imported.errors) st.toast(err, 'error');
       let t = 0;
       for (const a of imported) {
         if (a.type === 'audio') continue;
@@ -71,7 +73,7 @@ function NewProjectPanel({ onClose }) {
           })}
         </div>
       </div>
-      <input ref={fileRef} type="file" multiple accept="video/*,image/*,audio/*" className="hidden" onChange={(e) => create(e.target.files)} />
+      <input ref={fileRef} type="file" multiple accept={IMPORT_ACCEPT} className="hidden" onChange={(e) => create(e.target.files)} />
       <div className="grid grid-cols-2 gap-2">
         <button type="button" onClick={() => fileRef.current?.click()} className="flex items-center justify-center gap-2 rounded-xl bg-brand text-ink-950 font-bold text-[13px] py-3">
           <Upload size={16} /> Importar mídia

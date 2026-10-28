@@ -2,6 +2,7 @@ import { useMemo, useRef, useState } from 'react';
 import { Upload, Plus, Film, Image as ImageIcon, LoaderCircle } from 'lucide-react';
 import { useEditorStore } from '../../store/useEditorStore';
 import { importFiles } from '../../lib/importer';
+import { mediaKind, IMPORT_ACCEPT } from '../../lib/mediaTypes';
 import { formatTime } from '../../lib/utils';
 import { cx } from '../ui/primitives';
 import { SearchBox, Chips, PanelHeader, ASSET_MIME } from './shared';
@@ -62,14 +63,16 @@ export default function MediaTab() {
   }, [assets, q, cat]);
 
   const onFiles = async (files) => {
-    const arr = [...files].filter((f) => /^(video|image|audio)\//.test(f.type));
+    const arr = [...files];
     if (!arr.length) return;
+    if (!arr.some(mediaKind)) return toast('Formato não suportado. Use vídeos (MP4, MOV do iPhone, WebM…), imagens ou áudios.', 'warn');
     setBusy(true);
     try {
-      const imported = await importFiles(arr);
+      const imported = await importFiles(arr, { onStatus: setBusy });
       addAssets(imported);
-      toast(`${imported.length} arquivo(s) importado(s) — arraste para a timeline`, 'success');
-      setCat('Importado');
+      if (imported.length) toast(`${imported.length} arquivo(s) importado(s) — arraste para a timeline`, 'success');
+      for (const err of imported.errors) toast(err, 'error');
+      if (imported.length) setCat('Importado');
     } finally {
       setBusy(false);
     }
@@ -93,14 +96,14 @@ export default function MediaTab() {
       className={cx('min-h-full', over && 'bg-brand/5 outline outline-2 -outline-offset-4 outline-dashed outline-brand/60')}
     >
       <PanelHeader title="Mídia" subtitle="Importe vídeos, fotos e áudios ou use a biblioteca demo.">
-        <input ref={fileRef} type="file" multiple accept="video/*,image/*,audio/*" className="hidden" onChange={(e) => onFiles(e.target.files)} />
+        <input ref={fileRef} type="file" multiple accept={IMPORT_ACCEPT} className="hidden" onChange={(e) => onFiles(e.target.files)} />
         <button
           type="button"
           onClick={() => fileRef.current?.click()}
           className="w-full flex items-center justify-center gap-2 rounded-xl border border-dashed border-ink-500 hover:border-brand hover:bg-brand/5 py-4 text-[12px] text-ink-200 transition-colors"
         >
           {busy ? <LoaderCircle size={16} className="animate-spin" /> : <Upload size={16} />}
-          {busy ? 'Processando arquivos…' : 'Importar mídia  ·  ou arraste arquivos aqui'}
+          {busy ? (typeof busy === 'string' ? busy : 'Processando arquivos…') : 'Importar mídia  ·  ou arraste arquivos aqui'}
         </button>
         <SearchBox value={q} onChange={setQ} placeholder="Buscar mídia" />
         <Chips options={CATS} value={cat} onChange={setCat} />

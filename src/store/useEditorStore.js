@@ -11,6 +11,7 @@ import { clamp, uid, FRAME, snapToFrame, isActiveAt } from '../lib/utils';
 import { createDemoProject, createBlankProject, createLibraryAssets } from '../lib/demoProject';
 import { saveProjectRecord, loadProjectRecord, listProjects, deleteProjectRecord, getMedia, storageAvailable } from '../lib/projectStore';
 import { clipAudioToWav } from '../lib/audioExport';
+import { playableUrl } from '../lib/mediaTypes';
 import { isNativeApp, saveBlobNative } from '../lib/native';
 import {
   accepts,
@@ -85,7 +86,7 @@ export const useEditorStore = create(
     const toast = (msg, type = 'info') => {
       const id = uid('toast');
       set((s) => ({ toasts: [...s.toasts.slice(-3), { id, msg, type }] }));
-      setTimeout(() => set((s) => ({ toasts: s.toasts.filter((t) => t.id !== id) })), 3600);
+      setTimeout(() => set((s) => ({ toasts: s.toasts.filter((t) => t.id !== id) })), Math.max(3600, String(msg).length * 60));
     };
 
     const trackById = (id) => get().tracks.find((t) => t.id === id);
@@ -244,7 +245,7 @@ export const useEditorStore = create(
         for (const a of rec.assets || []) {
           const blob = a.mediaKey ? await getMedia(a.mediaKey) : null;
           if (!blob) missing++;
-          imported.push({ ...a, src: blob ? URL.createObjectURL(blob) : null, missing: !blob });
+          imported.push({ ...a, src: blob ? (a.type === 'video' ? playableUrl(blob, a.name) : URL.createObjectURL(blob)) : null, missing: !blob });
         }
         loadIntoStore({ project: rec.project, tracks: rec.tracks, clips: rec.clips, assets: [...imported, ...createLibraryAssets()], analysis: rec.analysis }, rec.id, { createdAt: rec.createdAt, leftTab: 'media' });
         if (missing) toast(`${missing} mídia(s) deste projeto não foram encontradas no aparelho`, 'warn');
