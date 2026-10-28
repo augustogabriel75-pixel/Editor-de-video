@@ -7,3 +7,7 @@ dist
 # build Android
 android/build/
 dist-single
+
+# app de PC (Windows)
+desktop/.cache/
+desktop/build/

@@ -1,0 +1,68 @@
+name: Windows (instalador .exe)
+
+on:
+  push:
+    paths-ignore: ['**.md', 'docs/**', 'android/**']
+  workflow_dispatch:
+
+permissions:
+  contents: write # publicar o instalador em Releases
+
+concurrency:
+  group: windows-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  installer:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: NSIS
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq nsis
+
+      - run: npm ci
+
+      - name: Cache dos downloads (Electron/FFmpeg)
+        uses: actions/cache@v4
+        with:
+          path: desktop/.cache
+          key: win-deps-${{ hashFiles('scripts/build-win.sh') }}
+
+      - name: Gerar instalador
+        run: bash scripts/build-win.sh
+
+      - name: Arquivo offline (HTML)
+        run: npm run build:single && (cd dist-single && zip -9 -q ../desktop/build/MotionCut-html.zip MotionCut.html)
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: MotionCut-Windows
+          path: desktop/build/MotionCut-Setup-*.exe
+          if-no-files-found: error
+
+      - name: Publicar em Releases
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          TAG="v$VERSION"
+          SETUP="desktop/build/MotionCut-Setup-$VERSION.exe"
+          NOTES="MotionCut $VERSION para PC (Windows 10/11, 64 bits).
+
+          1. Baixe **MotionCut-Setup-$VERSION.exe** e execute.
+          2. Se o Windows mostrar \"O Windows protegeu o computador\", clique em **Mais informações → Executar assim mesmo** (o instalador não tem assinatura digital paga).
+          3. O instalador cria atalhos na Área de Trabalho e no Menu Iniciar.
+
+          Inclui o FFmpeg (GPL), que converte sozinho vídeos .MOV do iPhone (HEVC/H.265 e HDR) na importação.
+          MotionCut-html.zip é a versão de navegador (um único arquivo HTML)."
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" "$SETUP" desktop/build/MotionCut-html.zip --clobber
+          else
+            gh release create "$TAG" "$SETUP" desktop/build/MotionCut-html.zip --target "$GITHUB_SHA" --title "MotionCut $VERSION" --notes "$NOTES"
+          fi

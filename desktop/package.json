@@ -1,0 +1,9 @@
+{
+  "name": "motioncut-desktop",
+  "productName": "MotionCut",
+  "version": "0.0.0",
+  "description": "MotionCut — editor de vídeo com IA Motion (app de PC)",
+  "main": "main.cjs",
+  "author": "MotionCut",
+  "private": true
+}

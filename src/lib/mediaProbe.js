@@ -80,7 +80,7 @@ export function explainUnplayable(name, info) {
   if (v?.codec === 'hevc') {
     return (
       `“${name}” está em HEVC (H.265), formato padrão do iPhone, e este navegador não tem decodificador HEVC. ` +
-      'Abra no Chrome ou Edge no Windows/Mac (com aceleração de vídeo do computador), no Safari do Mac ou no app Android. ' +
+      'Use o MotionCut para PC (instalador do Windows, converte HEVC sozinho), o Chrome/Edge no Windows/Mac com aceleração de vídeo, o Safari do Mac ou o app Android. ' +
       'No iPhone você também pode gravar em H.264: Ajustes › Câmera › Formatos › “Mais Compatível”.'
     );
   }

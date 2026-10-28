@@ -1,7 +1,7 @@
 {
   "name": "motioncut",
   "private": true,
-  "version": "1.6.0",
+  "version": "1.7.0",
   "description": "MotionCut — editor de vídeo web gratuito inspirado no CapCut, com motor de IA Motion contextual.",
   "type": "module",
   "scripts": {
@@ -9,7 +9,8 @@
     "build": "vite build",
     "preview": "vite preview",
     "apk": "bash scripts/build-apk.sh",
-    "build:single": "vite build --mode single && node scripts/rename-single.mjs"
+    "build:single": "vite build --mode single && node scripts/rename-single.mjs",
+    "win": "bash scripts/build-win.sh"
   },
   "dependencies": {
     "@audio/encode-aac": "^1.2.1",
@@ -32,6 +33,7 @@
   "devDependencies": {
     "@tailwindcss/vite": "^4.3.3",
     "@vitejs/plugin-react": "^5.2.0",
+    "resedit": "^3.1.0",
     "tailwindcss": "^4.3.3",
     "vite": "^7.3.7",
     "vite-plugin-singlefile": "^2.3.3"

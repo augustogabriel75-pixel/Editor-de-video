@@ -23,6 +23,15 @@ Stack: **React 19 + Vite**, **Tailwind CSS v4**, **Zustand** (estado global), **
 
 O projeto abre com uma demonstração de 30 s (apresentador, B-roll, narração e música lo-fi). Para ver o motor de IA, abra a aba **IA Motion** e clique em **Analisar Contexto do Vídeo**.
 
+### App para Windows (instalador .exe)
+
+O MotionCut também tem versão instalável para Windows 10/11 (64 bits), feita com Electron. Ela é recomendada para editar **vídeos do iPhone**: vem com o FFmpeg, que converte sozinho na importação os .MOV em HEVC (H.265), ProRes e HDR (as cores do HDR são ajustadas para SDR). Funciona em qualquer PC, mesmo sem suporte a HEVC na placa de vídeo.
+
+- **Baixar**: página *Releases* do repositório → `MotionCut-Setup-<versão>.exe`. O workflow `.github/workflows/windows.yml` gera e publica o instalador a cada push.
+- **Instalar**: execute o instalador e escolha a pasta (padrão: `%LOCALAPPDATA%\Programs\MotionCut`, sem precisar de administrador). Ele cria atalhos na Área de Trabalho e no Menu Iniciar e aparece em *Aplicativos instalados*, de onde pode ser desinstalado. Os projetos ficam em `%APPDATA%\MotionCut` e são mantidos ao desinstalar.
+- **Aviso do Windows**: o instalador não tem assinatura digital paga. Se aparecer “O Windows protegeu o computador”, clique em **Mais informações → Executar assim mesmo**.
+- **Gerar localmente** (no Linux): `sudo apt install nsis` e depois `npm run win`, que gera `desktop/build/MotionCut-Setup-<versão>.exe`. O script baixa o Electron e o FFmpeg (BtbN, GPL) e confere os checksums SHA-256.
+
 ### App Android (APK)
 
 O MotionCut também é um app Android: uma Activity nativa com WebView que carrega o editor empacotado. Funciona offline, com as fontes embutidas, e tem layout próprio para celular, no estilo do CapCut mobile.

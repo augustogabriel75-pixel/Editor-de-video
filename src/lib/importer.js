@@ -67,9 +67,37 @@ export async function importFiles(files, { onStatus } = {}) {
     const base = { id, mediaKey: id, name, imported: true, category: 'Importado', size: file.size, mime: file.type || '' };
     if (kind === 'video') {
       let meta = window.MOTIONCUT_FORCE_CONVERT ? null : await loadVideoMeta(src);
+      const desktop = window.MotionCutDesktop;
+      const diskPath = desktop?.pathForFile?.(file);
+      // App de PC: HEVC/ProRes que o Chromium não abre, ou HDR (cores lavadas no canvas),
+      // vão para o FFmpeg embutido e viram MP4 H.264 + AAC.
+      let info = null;
+      if (diskPath && (!meta || (info = await probeMedia(file)).video?.hdr)) {
+        onStatus?.(`Convertendo “${file.name}”…`);
+        const r = await desktop
+          .convert(diskPath, (p) => onStatus?.(`Convertendo “${file.name}”… ${Math.round(p * 100)}%`))
+          .catch((e) => ({ ok: false, error: String(e?.message || e) }));
+        if (r?.ok) {
+          const conv = new Blob([await (await fetch(r.url)).blob()], { type: 'video/mp4' });
+          const convSrc = URL.createObjectURL(conv);
+          const m2 = await loadVideoMeta(convSrc);
+          if (m2) {
+            URL.revokeObjectURL(src);
+            stored = conv;
+            src = convSrc;
+            meta = m2;
+            base.converted = true;
+          } else URL.revokeObjectURL(convSrc);
+        } else if (!meta) {
+          console.warn('FFmpeg falhou', r?.error);
+          out.errors.push(`“${file.name}”: falha ao converter com o FFmpeg (${r?.error || 'erro desconhecido'})`);
+          URL.revokeObjectURL(src);
+          continue;
+        }
+      }
       if (!meta) {
         // o <video> não abriu: descobre o motivo e, se o WebCodecs decodificar, converte
-        const info = await probeMedia(file);
+        info ||= await probeMedia(file);
         if (info.video?.canDecode) {
           onStatus?.(`Convertendo “${file.name}” (${info.video.label}) para um formato compatível…`);
           const conv = await transcodeForPlayback(file, { onProgress: (p) => onStatus?.(`Convertendo “${file.name}”… ${Math.round(p * 100)}%`) }).catch((e) => {
