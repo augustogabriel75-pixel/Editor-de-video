@@ -1,4 +1,4 @@
-import { Film, Music, Type, Zap, Shuffle, Palette, WandSparkles } from 'lucide-react';
+import { Film, Music, Type, Zap, Shuffle, Palette, WandSparkles, Aperture } from 'lucide-react';
 import { useEditorStore } from '../../store/useEditorStore';
 import { cx } from '../ui/primitives';
 import MediaTab from './MediaTab';
@@ -8,6 +8,7 @@ import EffectsTab from './EffectsTab';
 import TransitionsTab from './TransitionsTab';
 import FiltersTab from './FiltersTab';
 import AIMotionTab from './AIMotionTab';
+import LutTab from './LutTab';
 
 export const PANEL_TABS = [
   { id: 'media', label: 'Mídia', icon: Film, el: MediaTab },
@@ -16,6 +17,7 @@ export const PANEL_TABS = [
   { id: 'effects', label: 'Efeitos', icon: Zap, el: EffectsTab },
   { id: 'transitions', label: 'Transições', icon: Shuffle, el: TransitionsTab },
   { id: 'filters', label: 'Filtros', icon: Palette, el: FiltersTab },
+  { id: 'lut', label: 'LUT', icon: Aperture, el: LutTab },
   { id: 'ai', label: 'IA Motion', icon: WandSparkles, el: AIMotionTab, ai: true },
 ];
 

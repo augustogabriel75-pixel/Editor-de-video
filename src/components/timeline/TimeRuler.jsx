@@ -21,7 +21,7 @@ function PlayheadHead() {
   );
 }
 
-export default function TimeRuler({ width }) {
+export default function TimeRuler({ width, hideHead = false }) {
   const pps = useEditorStore((s) => s.pxPerSec);
   const analysis = useEditorStore((s) => s.ai.analysis);
   const seek = useEditorStore((s) => s.seek);
@@ -42,6 +42,7 @@ export default function TimeRuler({ width }) {
   }, [seconds, minor, major]);
 
   const onDown = (e) => {
+    if (hideHead) return; // celular: o playhead é fixo e a timeline é que desliza
     pause();
     const r = e.currentTarget.getBoundingClientRect();
     const at = (x) => Math.max(0, (x - r.left) / pps);
@@ -56,7 +57,7 @@ export default function TimeRuler({ width }) {
   };
 
   return (
-    <div className="relative bg-ink-900 border-b border-ink-700 cursor-pointer touch-none" style={{ width, height: RULER_H }} onPointerDown={onDown}>
+    <div className={`relative ${hideHead ? 'bg-ink-950' : 'bg-ink-900 border-b border-ink-700 cursor-pointer touch-none'}`} style={{ width, height: RULER_H }} onPointerDown={onDown}>
       <svg width={width} height={RULER_H} className="absolute inset-0">
         {ticks.map(({ t, isMajor }) => (
           <g key={t}>
@@ -71,7 +72,7 @@ export default function TimeRuler({ width }) {
         {analysis?.beats?.map((b, i) => <circle key={`b${i}`} cx={b.t * pps} cy={RULER_H - 3} r={1 + b.strength * 1.6} fill="#22d3ee" opacity={0.35 + b.strength * 0.5} />)}
         {analysis?.emphasis?.map((e, i) => <rect key={`e${i}`} x={e.t * pps - 2} y={RULER_H - 9} width="4" height="4" transform={`rotate(45 ${e.t * pps} ${RULER_H - 7})`} fill="#ec4899" opacity="0.85" />)}
       </svg>
-      <PlayheadHead />
+      {!hideHead && <PlayheadHead />}
     </div>
   );
 }

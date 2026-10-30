@@ -126,3 +126,21 @@ export default function Inspector({ embedded = false }) {
     </aside>
   );
 }
+
+/** Só o conteúdo de uma aba do inspetor para o clipe selecionado (ferramentas do layout móvel). */
+export function InspectorPanel({ tab }) {
+  const clip = useEditorStore(selectSelectedClip);
+  if (!clip) return <ProjectPanel />;
+  return (
+    <div className="pb-4">
+      {tab === 'video' && <VideoPanel clip={clip} />}
+      {tab === 'audio' && <AudioPanel clip={clip} />}
+      {tab === 'speed' && <SpeedPanel clip={clip} />}
+      {tab === 'anim' && <AnimationPanel clip={clip} />}
+      {tab === 'text' && <TextPanel clip={clip} />}
+      {tab === 'transform' && <TransformSection clip={clip} title="Posição e escala" />}
+      {tab === 'motion' && <MotionAIPanel clip={clip} />}
+      {tab === 'ai' && <ClipAIPanel clip={clip} />}
+    </div>
+  );
+}

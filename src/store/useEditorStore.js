@@ -9,7 +9,8 @@ import { create } from 'zustand';
 import { subscribeWithSelector } from 'zustand/middleware';
 import { clamp, uid, FRAME, snapToFrame, isActiveAt } from '../lib/utils';
 import { createDemoProject, createBlankProject, createLibraryAssets } from '../lib/demoProject';
-import { saveProjectRecord, loadProjectRecord, listProjects, deleteProjectRecord, getMedia, storageAvailable } from '../lib/projectStore';
+import { saveProjectRecord, loadProjectRecord, listProjects, deleteProjectRecord, getMedia, putMedia, storageAvailable } from '../lib/projectStore';
+import { parseCube, registerCustomLut, lutName } from '../lib/luts';
 import { clipAudioToWav } from '../lib/audioExport';
 import { playableUrl } from '../lib/mediaTypes';
 import { isNativeApp, saveBlobNative } from '../lib/native';
@@ -246,6 +247,14 @@ export const useEditorStore = create(
           const blob = a.mediaKey ? await getMedia(a.mediaKey) : null;
           if (!blob) missing++;
           imported.push({ ...a, src: blob ? (a.type === 'video' ? playableUrl(blob, a.name) : URL.createObjectURL(blob)) : null, missing: !blob });
+        }
+        for (const l of rec.project?.customLuts || []) {
+          try {
+            const blob = await getMedia(`lut:${l.id}`);
+            if (blob) registerCustomLut(l.id, l.name, parseCube(await blob.text()));
+          } catch (e) {
+            console.warn('LUT do projeto não carregado', l.name, e);
+          }
         }
         loadIntoStore({ project: rec.project, tracks: rec.tracks, clips: rec.clips, assets: [...imported, ...createLibraryAssets()], analysis: rec.analysis }, rec.id, { createdAt: rec.createdAt, leftTab: 'media' });
         if (missing) toast(`${missing} mídia(s) deste projeto não foram encontradas no aparelho`, 'warn');
@@ -693,6 +702,40 @@ export const useEditorStore = create(
         if (!c) return toast('Selecione um clipe de vídeo ou imagem', 'warn');
         checkpoint();
         commitClips(patchClip(c.id, (x) => ({ ...x, filter: { id: filterId, intensity: x.filter?.intensity ?? 100 } })), { selectedClipId: c.id });
+      },
+
+      /* ---------- LUTs */
+      applyLut: (lutId) => {
+        const c = selectedVisual();
+        if (!c) return toast('Selecione um clipe de vídeo ou imagem', 'warn');
+        checkpoint();
+        commitClips(patchClip(c.id, (x) => ({ ...x, lut: { id: lutId, intensity: x.lut?.intensity ?? 100 } })), { selectedClipId: c.id });
+      },
+      applyLutToAll: () => {
+        const c = selectedVisual();
+        const lut = c?.lut;
+        if (!lut) return toast('Escolha um LUT no clipe selecionado primeiro', 'warn');
+        checkpoint();
+        const visual = (x) => x.kind === 'video' || x.kind === 'image';
+        const n = get().clips.filter(visual).length;
+        commitClips(get().clips.map((x) => (visual(x) ? { ...x, lut: { ...lut } } : x)));
+        toast(lut.id === 'none' ? `LUT removido de ${n} clipe(s)` : `LUT “${lutName(lut.id)}” aplicado em ${n} clipe(s)`, 'success');
+      },
+      importLut: async (file) => {
+        try {
+          const text = await file.text();
+          const parsed = parseCube(text);
+          const id = uid('lut');
+          const name = (parsed.title || file.name.replace(/\.cube$/i, '')).slice(0, 40);
+          registerCustomLut(id, name, parsed);
+          if (storageAvailable()) await putMedia(`lut:${id}`, new Blob([text], { type: 'text/plain' }));
+          set((st) => ({ project: { ...st.project, customLuts: [...(st.project.customLuts || []), { id, name }] } }));
+          toast(`LUT “${name}” importado (${parsed.size}³)`, 'success');
+          return id;
+        } catch (e) {
+          toast(`Não foi possível ler o LUT: ${e.message}`, 'error');
+          return null;
+        }
       },
 
       setAnimation: (clipId, slot, animId, duration) => {

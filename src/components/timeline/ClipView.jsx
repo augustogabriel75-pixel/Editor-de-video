@@ -1,5 +1,5 @@
 import { memo } from 'react';
-import { Film, Image as ImageIcon, Type, Captions, AudioLines, Gauge, Zap, Diamond, Eraser, Shuffle, Palette, Mic } from 'lucide-react';
+import { Film, Image as ImageIcon, Type, Captions, AudioLines, Gauge, Zap, Diamond, Eraser, Shuffle, Palette, Mic, Aperture } from 'lucide-react';
 import { useEditorStore } from '../../store/useEditorStore';
 import { getTemplate, MOTION_CATEGORIES } from '../../engine/motionTemplates';
 import { iconFor } from '../ui/icons';
@@ -82,6 +82,7 @@ function Badges({ clip }) {
   else if (clip.speed && Math.abs(clip.speed - 1) > 0.01) items.push({ icon: Gauge, label: `${clip.speed.toFixed(clip.speed < 1 ? 2 : 1)}x` });
   if (clip.effects?.length) items.push({ icon: Zap, label: clip.effects.length });
   if (clip.filter && clip.filter.id !== 'none') items.push({ icon: Palette, label: '' });
+  if (clip.lut && clip.lut.id !== 'none') items.push({ icon: Aperture, label: 'LUT' });
   if (clip.bg && clip.bg.mode !== 'none') items.push({ icon: Eraser, label: clip.bg.mode === 'chroma' ? 'key' : 'IA' });
   if (!items.length) return null;
   return (

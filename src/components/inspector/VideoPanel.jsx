@@ -1,8 +1,9 @@
-import { Eraser, Pipette, SlidersHorizontal, Zap, Blend, Shuffle, X, ScanFace, Palette } from 'lucide-react';
+import { Eraser, Pipette, SlidersHorizontal, Zap, Blend, Shuffle, X, ScanFace, Palette, Aperture } from 'lucide-react';
 import { useEditorStore } from '../../store/useEditorStore';
 import { getEffect, getFilter, getTransition } from '../../lib/catalog';
 import { Section, Slider, Segmented, ColorField, SelectField, IconButton } from '../ui/primitives';
 import TransformSection from './TransformSection';
+import { lutName } from '../../lib/luts';
 
 export default function VideoPanel({ clip }) {
   const updateDeep = useEditorStore((s) => s.updateClipDeep);
@@ -89,6 +90,12 @@ export default function VideoPanel({ clip }) {
       {clip.filter.id !== 'none' && (
         <Section title={`Filtro · ${getFilter(clip.filter.id).name}`} icon={Palette} right={<IconButton icon={X} size={13} label="Remover filtro" onClick={() => updateDeep(clip.id, 'filter', { id: 'none' })} />}>
           <Slider label="Intensidade" value={clip.filter.intensity} min={0} max={100} suffix="%" onChange={(v) => updateDeep(clip.id, 'filter', { intensity: v }, k('fi'))} />
+        </Section>
+      )}
+
+      {clip.lut && clip.lut.id !== 'none' && (
+        <Section title={`LUT · ${lutName(clip.lut.id)}`} icon={Aperture} right={<IconButton icon={X} size={13} label="Remover LUT" onClick={() => updateDeep(clip.id, 'lut', { id: 'none' })} />}>
+          <Slider label="Intensidade" value={clip.lut.intensity ?? 100} min={0} max={100} suffix="%" onChange={(v) => updateDeep(clip.id, 'lut', { intensity: v }, k('lut'))} />
         </Section>
       )}
 

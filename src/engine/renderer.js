@@ -12,6 +12,8 @@
  */
 import { clamp, Easing, hashString, isActiveAt } from '../lib/utils';
 import { buildFilterString, getFilter, DEFAULT_TEXT_STYLE } from '../lib/catalog';
+import { getLut } from '../lib/luts';
+import { applyLutToLayer } from './lutGL';
 import { sourceOffsetAt, instantSpeedAt } from '../lib/speedCurves';
 import { getTransformAt } from '../lib/keyframes';
 import { getDemoFrame } from './demoSources';
@@ -368,6 +370,7 @@ function drawVisualClip(target, clip, time, W, H, state, opts, slot, track, tran
     lctx.fillRect(0, 0, W, H);
     lctx.restore();
   }
+  if (clip.lut?.id && clip.lut.id !== 'none') applyLutToLayer(lctx, layer, getLut(clip.lut.id), (clip.lut.intensity ?? 100) / 100);
   applyClipEffects(lctx, clip, lt);
 
   if (slot !== 'prev') lastBounds.set(clip.id, { cx, cy, w: dw * sc, h: dh * sc, rot, W, H });
